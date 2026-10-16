@@ -205,6 +205,16 @@ console.log(`   • ${userA.username} bought: ${shopResult.item.name} for ${shop
 const userAFinal = UserService.getUser(userA.id)!;
 console.log(`   • Remaining Balance: ${userAFinal.balance} coins`);
 
+// 13. Clean up simulation artifacts so live database is clean
+TeamGroupService.resetAllGroups();
+db.prepare("DELETE FROM ticket_legs WHERE ticket_id IN (SELECT id FROM tickets WHERE user_id LIKE 'test_user_%')").run();
+db.prepare("DELETE FROM tickets WHERE user_id LIKE 'test_user_%'").run();
+db.prepare("DELETE FROM transactions_ledger WHERE user_id LIKE 'test_user_%'").run();
+db.prepare("DELETE FROM user_inventory WHERE user_id LIKE 'test_user_%'").run();
+db.prepare("DELETE FROM users WHERE id LIKE 'test_user_%'").run();
+
+console.log('\n🧹 Simulation cleanup completed: 43 teams remain cleanly UNGROUPED for live tournament use.');
+
 console.log('\n🎉 ========================================================');
 console.log('🎉 ALL 12 ENGINE SIMULATION TESTS PASSED FLAWLESSLY!');
 console.log('🎉 ========================================================\n');

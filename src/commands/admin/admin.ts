@@ -79,6 +79,22 @@ export const adminCommand = {
         )
     )
 
+    // Subcommand: Match Create with ALL 43 Teams (Anyone can predict any team)
+    .addSubcommand((sub) =>
+      sub
+        .setName('match-create-all')
+        .setDescription('Create a match lobby containing ALL 43 registered teams (anyone can predict any team!)')
+        .addIntegerOption((opt) => opt.setName('match_number').setDescription('Match sequence number (e.g. 1)').setRequired(true))
+        .addStringOption((opt) => opt.setName('lobby_name').setDescription('Map or Lobby name (e.g. Cayo Perico Arena)').setRequired(true))
+        .addIntegerOption((opt) =>
+          opt
+            .setName('deadline_minutes')
+            .setDescription('Minutes from now until prediction market locks')
+            .setRequired(true)
+            .setMinValue(1)
+        )
+    )
+
     // Subcommand: Match List
     .addSubcommand((sub) => sub.setName('match-list').setDescription('List all matches in the active season'))
 
@@ -124,6 +140,13 @@ export const adminCommand = {
             .setMinValue(2)
             .setMaxValue(6)
         )
+    )
+
+    // Subcommand: Group Reset
+    .addSubcommand((sub) =>
+      sub
+        .setName('group-reset')
+        .setDescription('Reset all 43 teams back to UNGROUPED so you can organize them fresh')
     )
 
     // Subcommand: Admin Role Add
@@ -272,6 +295,35 @@ export const adminCommand = {
       return;
     }
 
+    // 2b. Match Create with ALL 43 Teams
+    if (subcommand === 'match-create-all') {
+      const matchNum = interaction.options.getInteger('match_number', true);
+      const lobbyName = interaction.options.getString('lobby_name', true);
+      const deadlineMins = interaction.options.getInteger('deadline_minutes', true);
+
+      const allRegisteredTeams = TeamGroupService.getAllTeams().map((t) => t.name);
+
+      const now = Date.now();
+      const scheduledTime = now + deadlineMins * 60 * 1000;
+      const deadline = scheduledTime;
+
+      const match = MatchService.createMatch(matchNum, `${lobbyName} (All 43 Teams)`, scheduledTime, deadline, allRegisteredTeams, allRegisteredTeams);
+
+      const embed = new EmbedBuilder()
+        .setColor('#2ECC71')
+        .setTitle(`🌐 Created All-Teams Match #${match.match_number}: ${match.lobby_name}`)
+        .setDescription('**All 43 registered tournament teams are in this lobby!** Anyone can predict any team.')
+        .addFields(
+          { name: 'Match ID', value: `\`${match.id}\``, inline: true },
+          { name: 'Lobby Size', value: `\`${allRegisteredTeams.length}\` teams`, inline: true },
+          { name: 'Locks In', value: `<t:${Math.floor(deadline / 1000)}:R>`, inline: true }
+        )
+        .setFooter({ text: 'Prediction markets are open for all teams!' });
+
+      await interaction.reply({ embeds: [embed] });
+      return;
+    }
+
     // 3. Match List
     if (subcommand === 'match-list') {
       const season = MatchService.getActiveSeason();
@@ -399,6 +451,19 @@ export const adminCommand = {
       }
 
       embed.setFooter({ text: 'You can now create matches using /admin match-create-groups!' });
+
+      await interaction.reply({ embeds: [embed] });
+      return;
+    }
+
+    // 7b. Group Reset
+    if (subcommand === 'group-reset') {
+      const resetCount = TeamGroupService.resetAllGroups();
+      const embed = new EmbedBuilder()
+        .setColor('#E67E22')
+        .setTitle('🔄 Tournament Groups Reset')
+        .setDescription(`Successfully reset **${resetCount} teams** back to **UNGROUPED**.\nAll teams are now clear of any previous random groups!`)
+        .setFooter({ text: 'Use /admin group-set when you are ready to assign official groups.' });
 
       await interaction.reply({ embeds: [embed] });
       return;

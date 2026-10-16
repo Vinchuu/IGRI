@@ -103,6 +103,14 @@ export class TeamGroupService {
   }
 
   /**
+   * Resets all teams to ungrouped (group_name = NULL)
+   */
+  static resetAllGroups(): number {
+    const info = db.prepare('UPDATE teams SET group_name = NULL').run();
+    return info.changes;
+  }
+
+  /**
    * Searches teams for Discord slash command autocomplete
    */
   static searchTeams(query: string, limit = 25): string[] {
