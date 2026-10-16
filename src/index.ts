@@ -17,6 +17,7 @@ import { myTicketsCommand } from './commands/user/mytickets.js';
 import { predictCommand } from './commands/user/predict.js';
 import { profileCommand } from './commands/user/profile.js';
 import { shopCommand } from './commands/user/shop.js';
+import { fanbaseCommand } from './commands/user/fanbase.js';
 import { handleButtonInteraction, handleSelectMenuInteraction } from './interactions/buttonHandler.js';
 import { MatchService } from './services/MatchService.js';
 
@@ -30,6 +31,7 @@ const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.GuildMembers,
   ],
   partials: [Partials.Channel, Partials.Message],
 });
@@ -40,6 +42,7 @@ const commandList = [
   adminCommand,
   balanceCommand,
   dailyCommand,
+  fanbaseCommand,
   igriCommand,
   leaderboardCommand,
   matchesCommand,

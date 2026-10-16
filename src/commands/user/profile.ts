@@ -1,5 +1,6 @@
 import { ChatInputCommandInteraction, EmbedBuilder, SlashCommandBuilder } from 'discord.js';
 import { UserService } from '../../services/UserService.js';
+import { FanService } from '../../services/FanService.js';
 
 export const profileCommand = {
   data: new SlashCommandBuilder()
@@ -13,6 +14,13 @@ export const profileCommand = {
     const targetUser = interaction.options.getUser('target') || interaction.user;
     const user = UserService.getOrCreateUser(targetUser.id, targetUser.username);
     const inventory = UserService.getUserInventory(user.id);
+
+    // Check if user has a team role in the guild
+    const member = interaction.guild?.members.cache.get(targetUser.id);
+    const teamRole = FanService.getUserTeamRole(member);
+    const allegianceText = teamRole 
+      ? `🛡️ Crew Allegiance: <@&${teamRole.roleId}>\n` 
+      : '🛡️ Crew Allegiance: *Independent Analyst*\n';
 
     const accuracyPercent = user.resolved_selections > 0 
       ? ((user.correct_selections / user.resolved_selections) * 100).toFixed(1)
@@ -33,7 +41,11 @@ export const profileCommand = {
       .setColor('#9B59B6')
       .setTitle(`🏆 ${user.username}'s Arena Dossier`)
       .setThumbnail(targetUser.displayAvatarURL())
-      .setDescription(`Current Title: **${user.equipped_title}**\nActive Streak: **${user.daily_streak} days** 🔥`)
+      .setDescription(
+        `${allegianceText}` +
+        `Current Title: **${user.equipped_title}**\n` +
+        `Active Streak: **${user.daily_streak} days** 🔥`
+      )
       .addFields(
         {
           name: '🪙 Balance',

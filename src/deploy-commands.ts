@@ -10,11 +10,13 @@ import { myTicketsCommand } from './commands/user/mytickets.js';
 import { predictCommand } from './commands/user/predict.js';
 import { profileCommand } from './commands/user/profile.js';
 import { shopCommand } from './commands/user/shop.js';
+import { fanbaseCommand } from './commands/user/fanbase.js';
 
 const commands = [
   adminCommand.data.toJSON(),
   balanceCommand.data.toJSON(),
   dailyCommand.data.toJSON(),
+  fanbaseCommand.data.toJSON(),
   igriCommand.data.toJSON(),
   leaderboardCommand.data.toJSON(),
   matchesCommand.data.toJSON(),
