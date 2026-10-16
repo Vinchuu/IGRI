@@ -99,6 +99,73 @@ export async function handleButtonInteraction(interaction: ButtonInteraction): P
     return;
   }
 
+  // Help Menu Buttons
+  if (customId === 'help_player_cmds') {
+    const embed = new EmbedBuilder()
+      .setColor('#3498DB')
+      .setTitle('🎮 Player Commands Reference')
+      .setDescription('All commands available to every competitor in the arena:')
+      .addFields(
+        { name: '🕹️ `/igri`', value: 'Opens the main interactive dashboard with quick-action buttons.' },
+        { name: '🎮 `/matches`', value: 'Browse upcoming open tournament lobbies, participating crews, and deadlines.' },
+        { name: '🎯 `/predict`', value: 'Build a 2 to 5 match combo prediction ticket (with auto-suggested team names!).' },
+        { name: '🎫 `/mytickets`', value: 'Live ticket tracker showing progress on all your active and settled combo slips.' },
+        { name: '💳 `/balance`', value: 'Check your virtual coin balance, reserved open stakes, and transaction history.' },
+        { name: '🎁 `/daily`', value: 'Open your 24-hour Daily Mystery Box for bonus coins & login streak multipliers.' },
+        { name: '🏆 `/profile [user]`', value: 'Inspect your or another player’s dossier, accuracy %, badges, and crew role.' },
+        { name: '📊 `/leaderboard`', value: 'Official ranked season standings: 60% Profit Score + 40% Accuracy Score.' },
+        { name: '⚔️ `/fanbase`', value: 'The Fanbase / Crew War leaderboard comparing team supporters across the server.' },
+        { name: '🛍️ `/shop`', value: 'Spend surplus coins on exclusive titles, profile badges, and Discord roles.' }
+      )
+      .setFooter({ text: 'iGRI Fantasy Arena • Start predicting today!' });
+
+    await interaction.reply({ embeds: [embed], ephemeral: true });
+    return;
+  }
+
+  if (customId === 'help_fanbase_guide') {
+    const embed = new EmbedBuilder()
+      .setColor('#9B59B6')
+      .setTitle('🛡️ Crew Allegiance & Fanbase War Guide')
+      .setDescription(
+        '**Represent your favorite squad in the tournament!**\n\n' +
+        '1️⃣ **Get Your Team Role:**\n' +
+        'Grab the Discord role for your crew in this server (e.g. `@NXT8`, `@REDLINE`, `@Pew Pew`, etc.).\n\n' +
+        '2️⃣ **Automatic Dossier Allegiance:**\n' +
+        'When anyone views your `/profile`, the bot automatically proudly displays your team role!\n\n' +
+        '3️⃣ **Compete in the Fanbase Wars (`/fanbase`):**\n' +
+        'All your winning prediction profits and accuracy stats contribute to your team’s total fanbase score on the `/fanbase` leaderboard!\n\n' +
+        '4️⃣ **One-Click Slip Copying:**\n' +
+        'When your teammates share their winning slips in chat, click **`[ 📋 Copy Ticket ]`** to back the exact same picks with 1 click!'
+      )
+      .setFooter({ text: 'May the sharpest crew win the arena!' });
+
+    await interaction.reply({ embeds: [embed], ephemeral: true });
+    return;
+  }
+
+  if (customId === 'help_admin_guide') {
+    const embed = new EmbedBuilder()
+      .setColor('#E67E22')
+      .setTitle('⚙️ Tournament Administrator Guide')
+      .setDescription(
+        '**Authorized Roles:** Server Administrators or members with roles: **`.`**, **`...`**, or **`Crew`** (or added via `/admin role-add`).\n\n' +
+        '**Step 1: Set up Groups**\n' +
+        '• Run `/admin group-auto-split groups_count: 3` to divide all 43 teams into balanced groups (Group A, B, C).\n\n' +
+        '**Step 2: Create Match Lobbies**\n' +
+        '• Run `/admin match-create-groups group1: "Group A" group2: "Group B"` to automatically pull participating teams and open the market.\n\n' +
+        '**Step 3: Declare Results After Every Match**\n' +
+        '• When the match finishes in FiveM, declare results immediately:\n' +
+        '  `/admin result match_id: 1 winner_1st: NXT8 second_2nd: REDLINE third_3rd: Pew Pew top_fragger: NXT8`\n' +
+        '  *(The bot instantly marks all active player slips as won or lost!)*\n\n' +
+        '**Step 4: Season / Day Settlement**\n' +
+        '• At the end of the tournament day, run `/admin season-settle` to burn the 5% sink and distribute winnings directly into players’ balances!'
+      );
+
+    await interaction.reply({ embeds: [embed], ephemeral: true });
+    return;
+  }
+
   // 2. Share Ticket / Flex
   if (customId.startsWith('share_ticket_')) {
     const ticketId = parseInt(customId.replace('share_ticket_', ''), 10);

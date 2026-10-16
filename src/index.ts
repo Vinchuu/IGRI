@@ -18,6 +18,7 @@ import { predictCommand } from './commands/user/predict.js';
 import { profileCommand } from './commands/user/profile.js';
 import { shopCommand } from './commands/user/shop.js';
 import { fanbaseCommand } from './commands/user/fanbase.js';
+import { helpCommand } from './commands/user/help.js';
 import { handleButtonInteraction, handleSelectMenuInteraction } from './interactions/buttonHandler.js';
 import { MatchService } from './services/MatchService.js';
 
@@ -43,6 +44,7 @@ const commandList = [
   balanceCommand,
   dailyCommand,
   fanbaseCommand,
+  helpCommand,
   igriCommand,
   leaderboardCommand,
   matchesCommand,

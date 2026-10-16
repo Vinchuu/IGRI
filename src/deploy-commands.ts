@@ -11,12 +11,14 @@ import { predictCommand } from './commands/user/predict.js';
 import { profileCommand } from './commands/user/profile.js';
 import { shopCommand } from './commands/user/shop.js';
 import { fanbaseCommand } from './commands/user/fanbase.js';
+import { helpCommand } from './commands/user/help.js';
 
 const commands = [
   adminCommand.data.toJSON(),
   balanceCommand.data.toJSON(),
   dailyCommand.data.toJSON(),
   fanbaseCommand.data.toJSON(),
+  helpCommand.data.toJSON(),
   igriCommand.data.toJSON(),
   leaderboardCommand.data.toJSON(),
   matchesCommand.data.toJSON(),
