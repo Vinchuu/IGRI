@@ -97,14 +97,23 @@ npm start
 
 ---
 
-### Administrator Commands (Admin Only)
+### Administrator Commands
+*(Accessible by users with Discord Administrator, or roles: `.`, `...`, `Crew`, or any roles added via `/admin role-add`)*
+
 | Command | Description |
 | :--- | :--- |
-| `/admin match-create` | Create a new match lobby with participating teams and deadline. |
-| `/admin match-list` | View all matches and statuses (`OPEN`, `LOCKED`, `SETTLED`). |
-| `/admin result` | Enter official results: **1st Place, 2nd Place, 3rd Place, and Top Fragger**. The bot automatically updates all player tickets. |
+| `/admin match-create-groups` | **Best for Tournament Format:** Create a lobby by combining 2 groups (e.g. `Group A` vs `Group B`). |
+| `/admin match-create` | Create a match lobby with custom comma-separated teams. |
+| `/admin match-list` | View all season matches and real-time status. |
+| `/admin result` | **Declare result after every match:** Enter 1st, 2nd, 3rd, and Top Fragger (with auto-suggest!). Resolves player slips and posts announcement. |
+| `/admin group-set` | Assign teams to a tournament group (e.g. Group A, Group B). |
+| `/admin group-list` | Display all tournament groups and their roster of teams. |
+| `/admin group-auto-split` | Automatically split all 43 registered teams into 3 or 4 balanced groups! |
+| `/admin role-add` | Add a role name or role ID to authorized administrator access. |
+| `/admin role-remove` | Remove a role from administrator access. |
+| `/admin role-list` | View all authorized admin roles (defaults: `.`, `...`, `Crew`). |
 | `/admin cancel` | Cancel a match and trigger the **Void Leg (Push)** rule or refund. |
-| `/admin season-settle` | Calculate the season pool, burn the 5% sink, and distribute winnings! |
+| `/admin season-settle` | Settle tournament day/season pool, burn 5% sink, and distribute winnings! |
 | `/admin audit` | View total money supply, active tickets, and economy telemetry. |
 
 ---

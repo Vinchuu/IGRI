@@ -70,6 +70,14 @@ client.once('ready', (c) => {
 // Interaction Dispatcher
 client.on('interactionCreate', async (interaction: Interaction) => {
   try {
+    if (interaction.isAutocomplete()) {
+      const command = commands.get(interaction.commandName);
+      if (command && typeof command.autocomplete === 'function') {
+        await command.autocomplete(interaction);
+      }
+      return;
+    }
+
     if (interaction.isChatInputCommand()) {
       const command = commands.get(interaction.commandName);
       if (!command) {

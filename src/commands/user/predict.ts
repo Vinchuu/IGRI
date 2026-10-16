@@ -8,6 +8,7 @@ import {
 } from 'discord.js';
 import { MatchService } from '../../services/MatchService.js';
 import { LegDraft, PredictionService } from '../../services/PredictionService.js';
+import { TeamGroupService } from '../../services/TeamGroupService.js';
 import { MarketType } from '../../types/index.js';
 
 export const predictCommand = {
@@ -33,7 +34,7 @@ export const predictCommand = {
           { name: '🎯 Top Fragger', value: 'TOP_FRAGGER' }
         )
     )
-    .addStringOption((opt) => opt.setName('pick1').setDescription('Team or Player name for Leg 1').setRequired(true))
+    .addStringOption((opt) => opt.setName('pick1').setDescription('Team or Player name for Leg 1').setRequired(true).setAutocomplete(true))
     // Leg 2
     .addIntegerOption((opt) => opt.setName('match2').setDescription('Match ID for Leg 2').setRequired(true))
     .addStringOption((opt) =>
@@ -46,7 +47,7 @@ export const predictCommand = {
           { name: '🎯 Top Fragger', value: 'TOP_FRAGGER' }
         )
     )
-    .addStringOption((opt) => opt.setName('pick2').setDescription('Team or Player name for Leg 2').setRequired(true))
+    .addStringOption((opt) => opt.setName('pick2').setDescription('Team or Player name for Leg 2').setRequired(true).setAutocomplete(true))
     // Leg 3 (Optional)
     .addIntegerOption((opt) => opt.setName('match3').setDescription('Match ID for Leg 3 (Optional)').setRequired(false))
     .addStringOption((opt) =>
@@ -59,7 +60,7 @@ export const predictCommand = {
           { name: '🎯 Top Fragger', value: 'TOP_FRAGGER' }
         )
     )
-    .addStringOption((opt) => opt.setName('pick3').setDescription('Team or Player for Leg 3').setRequired(false))
+    .addStringOption((opt) => opt.setName('pick3').setDescription('Team or Player for Leg 3').setRequired(false).setAutocomplete(true))
     // Leg 4 (Optional)
     .addIntegerOption((opt) => opt.setName('match4').setDescription('Match ID for Leg 4 (Optional)').setRequired(false))
     .addStringOption((opt) =>
@@ -72,7 +73,7 @@ export const predictCommand = {
           { name: '🎯 Top Fragger', value: 'TOP_FRAGGER' }
         )
     )
-    .addStringOption((opt) => opt.setName('pick4').setDescription('Team or Player for Leg 4').setRequired(false))
+    .addStringOption((opt) => opt.setName('pick4').setDescription('Team or Player for Leg 4').setRequired(false).setAutocomplete(true))
     // Leg 5 (Optional)
     .addIntegerOption((opt) => opt.setName('match5').setDescription('Match ID for Leg 5 (Optional)').setRequired(false))
     .addStringOption((opt) =>
@@ -85,7 +86,14 @@ export const predictCommand = {
           { name: '🎯 Top Fragger', value: 'TOP_FRAGGER' }
         )
     )
-    .addStringOption((opt) => opt.setName('pick5').setDescription('Team or Player for Leg 5').setRequired(false)),
+    .addStringOption((opt) => opt.setName('pick5').setDescription('Team or Player for Leg 5').setRequired(false).setAutocomplete(true)),
+
+  async autocomplete(interaction: any): Promise<void> {
+    const focused = interaction.options.getFocused(true);
+    const query = focused.value.toLowerCase();
+    const suggestions = TeamGroupService.searchTeams(query, 25);
+    await interaction.respond(suggestions.map((name) => ({ name, value: name })));
+  },
 
   async execute(interaction: ChatInputCommandInteraction): Promise<void> {
     const stake = interaction.options.getInteger('stake', true);

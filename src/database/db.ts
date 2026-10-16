@@ -113,10 +113,23 @@ export function initDatabase(): void {
       UNIQUE(user_id, item_id)
     );
 
+    CREATE TABLE IF NOT EXISTS teams (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL UNIQUE,
+      group_name TEXT DEFAULT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS admin_roles (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      role_identifier TEXT NOT NULL UNIQUE,
+      added_at INTEGER NOT NULL
+    );
+
     CREATE INDEX IF NOT EXISTS idx_tickets_user ON tickets(user_id);
     CREATE INDEX IF NOT EXISTS idx_tickets_season ON tickets(season_id);
     CREATE INDEX IF NOT EXISTS idx_legs_match ON ticket_legs(match_id);
     CREATE INDEX IF NOT EXISTS idx_transactions_user ON transactions_ledger(user_id);
+    CREATE INDEX IF NOT EXISTS idx_teams_group ON teams(group_name);
   `);
 
   // Seed default Season 1 if none exists
@@ -139,4 +152,73 @@ export function initDatabase(): void {
   seedShopItem.run('title_champion', '👑 Arena Champion', 'Title: Revered champion of the iGRI lobby', 50000, 'TITLE', '👑');
   seedShopItem.run('badge_sharpshooter', '🎯 Sharpshooter Badge', 'Badge displayed proudly on your profile card', 5000, 'BADGE', '🎯');
   seedShopItem.run('badge_whale', '🐋 Whale Badge', 'Show the Discord server your virtual wealth', 20000, 'BADGE', '🐋');
+
+  // Seed default admin roles ('.', '...', 'Crew')
+  const defaultAdminRoles = ['.', '...', 'Crew'];
+  const insertAdminRole = db.prepare(`
+    INSERT OR IGNORE INTO admin_roles (role_identifier, added_at)
+    VALUES (?, ?)
+  `);
+  for (const role of defaultAdminRoles) {
+    insertAdminRole.run(role, Date.now());
+  }
+
+  // Seed the 43 official iGRI tournament teams
+  const officialTeams = [
+    'NXT8',
+    'No Rules',
+    'REDLINE',
+    'Washed out',
+    'Mangalyaan',
+    'Red network',
+    'Pew Pew',
+    'Guns n roses',
+    'Sayless',
+    'Black reign',
+    'Pookie.Exe',
+    'Wardogs',
+    'No limit',
+    'Sapola',
+    '1Invictuz',
+    'Silent trigger',
+    '2Fast',
+    'W Esports',
+    'Team Healers',
+    'Underlords',
+    'Nothing2lose',
+    'Kalyug',
+    'Wz Demons',
+    'Team rip',
+    'Just chill',
+    'Team og',
+    'Phantoms',
+    'Whiffgods',
+    'We gucci',
+    'Onlypanic',
+    'Skillz',
+    'The escapers',
+    'Death brigade',
+    'Team bbg',
+    'Ravenx',
+    'Santra Esports',
+    'Goat protocol',
+    'Early eliminators',
+    'Code 999',
+    'The final dispatch',
+    'Zero plans',
+    'Low fps',
+    'Road killers',
+  ];
+
+  const insertTeam = db.prepare(`
+    INSERT OR IGNORE INTO teams (name, group_name)
+    VALUES (?, NULL)
+  `);
+
+  const seedTeamsTx = db.transaction(() => {
+    for (const team of officialTeams) {
+      insertTeam.run(team);
+    }
+  });
+  seedTeamsTx();
 }
