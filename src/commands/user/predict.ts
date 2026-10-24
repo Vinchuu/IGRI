@@ -1,5 +1,6 @@
 import {
   ActionRowBuilder,
+  AutocompleteInteraction,
   ButtonBuilder,
   ButtonStyle,
   ChatInputCommandInteraction,
@@ -9,117 +10,184 @@ import {
 import { MatchService } from '../../services/MatchService.js';
 import { LegDraft, PredictionService } from '../../services/PredictionService.js';
 import { TeamGroupService } from '../../services/TeamGroupService.js';
+import { formatTeamWithEmoji, SERVER_EMOJIS } from '../../utils/emojis.js';
 import { MarketType } from '../../types/index.js';
+import { UserUI } from '../../ui/UserUI.js';
 
 export const predictCommand = {
   data: new SlashCommandBuilder()
     .setName('predict')
-    .setDescription('Build and confirm a 2-to-5 match combo prediction ticket')
+    .setDescription('Predict tournament positions (#1, 2-3, 3-5, 5-10, 11-16) for a combo ticket')
     .addIntegerOption((opt) =>
       opt.setName('stake')
-        .setDescription('Virtual coins to stake (50 to 1,000 coins)')
+        .setDescription('Virtual coins to stake (50 to 1,000 coins) — leave empty for interactive builder')
         .setMinValue(50)
         .setMaxValue(1000)
-        .setRequired(true)
-    )
-    // Leg 1
-    .addIntegerOption((opt) => opt.setName('match1').setDescription('Match ID for Leg 1').setRequired(true))
-    .addStringOption((opt) =>
-      opt.setName('market1')
-        .setDescription('Market type for Leg 1')
-        .setRequired(true)
-        .addChoices(
-          { name: '🥇 1st Place (Winner)', value: 'WINNER' },
-          { name: '🥉 Top 3 Finish', value: 'TOP_3' },
-          { name: '🎯 Top Fragger', value: 'TOP_FRAGGER' }
-        )
-    )
-    .addStringOption((opt) => opt.setName('pick1').setDescription('Team or Player name for Leg 1').setRequired(true).setAutocomplete(true))
-    // Leg 2
-    .addIntegerOption((opt) => opt.setName('match2').setDescription('Match ID for Leg 2').setRequired(true))
-    .addStringOption((opt) =>
-      opt.setName('market2')
-        .setDescription('Market type for Leg 2')
-        .setRequired(true)
-        .addChoices(
-          { name: '🥇 1st Place (Winner)', value: 'WINNER' },
-          { name: '🥉 Top 3 Finish', value: 'TOP_3' },
-          { name: '🎯 Top Fragger', value: 'TOP_FRAGGER' }
-        )
-    )
-    .addStringOption((opt) => opt.setName('pick2').setDescription('Team or Player name for Leg 2').setRequired(true).setAutocomplete(true))
-    // Leg 3 (Optional)
-    .addIntegerOption((opt) => opt.setName('match3').setDescription('Match ID for Leg 3 (Optional)').setRequired(false))
-    .addStringOption((opt) =>
-      opt.setName('market3')
-        .setDescription('Market type for Leg 3')
         .setRequired(false)
-        .addChoices(
-          { name: '🥇 1st Place (Winner)', value: 'WINNER' },
-          { name: '🥉 Top 3 Finish', value: 'TOP_3' },
-          { name: '🎯 Top Fragger', value: 'TOP_FRAGGER' }
-        )
     )
-    .addStringOption((opt) => opt.setName('pick3').setDescription('Team or Player for Leg 3').setRequired(false).setAutocomplete(true))
-    // Leg 4 (Optional)
-    .addIntegerOption((opt) => opt.setName('match4').setDescription('Match ID for Leg 4 (Optional)').setRequired(false))
     .addStringOption((opt) =>
-      opt.setName('market4')
-        .setDescription('Market type for Leg 4')
+      opt.setName('match')
+        .setDescription('Select match lobby (auto-selects if only 1 match is open)')
         .setRequired(false)
-        .addChoices(
-          { name: '🥇 1st Place (Winner)', value: 'WINNER' },
-          { name: '🥉 Top 3 Finish', value: 'TOP_3' },
-          { name: '🎯 Top Fragger', value: 'TOP_FRAGGER' }
-        )
+        .setAutocomplete(true)
     )
-    .addStringOption((opt) => opt.setName('pick4').setDescription('Team or Player for Leg 4').setRequired(false).setAutocomplete(true))
-    // Leg 5 (Optional)
-    .addIntegerOption((opt) => opt.setName('match5').setDescription('Match ID for Leg 5 (Optional)').setRequired(false))
     .addStringOption((opt) =>
-      opt.setName('market5')
-        .setDescription('Market type for Leg 5')
+      opt.setName('pos_1')
+        .setDescription('🥇 #1 Winner (Champion)')
         .setRequired(false)
-        .addChoices(
-          { name: '🥇 1st Place (Winner)', value: 'WINNER' },
-          { name: '🥉 Top 3 Finish', value: 'TOP_3' },
-          { name: '🎯 Top Fragger', value: 'TOP_FRAGGER' }
-        )
+        .setAutocomplete(true)
     )
-    .addStringOption((opt) => opt.setName('pick5').setDescription('Team or Player for Leg 5').setRequired(false).setAutocomplete(true)),
+    .addStringOption((opt) =>
+      opt.setName('pos_2_3')
+        .setDescription('🥈 #2 - #3 (Podium finish)')
+        .setRequired(false)
+        .setAutocomplete(true)
+    )
+    .addStringOption((opt) =>
+      opt.setName('pos_3_5')
+        .setDescription('🎖️ #3 - #5 (Top 5 finish)')
+        .setRequired(false)
+        .setAutocomplete(true)
+    )
+    .addStringOption((opt) =>
+      opt.setName('pos_5_10')
+        .setDescription('🎯 #5 - #10 (Top 10 finish)')
+        .setRequired(false)
+        .setAutocomplete(true)
+    )
+    .addStringOption((opt) =>
+      opt.setName('pos_11_16')
+        .setDescription('💀 #11 - #16 (Placement finish)')
+        .setRequired(false)
+        .setAutocomplete(true)
+    ),
 
-  async autocomplete(interaction: any): Promise<void> {
+  async autocomplete(interaction: AutocompleteInteraction): Promise<void> {
     const focused = interaction.options.getFocused(true);
+
+    if (focused.name === 'match') {
+      const openMatches = MatchService.getOpenMatches();
+      const suggestions = openMatches
+        .filter((m) => m.lobby_name.toLowerCase().includes(focused.value.toLowerCase()))
+        .slice(0, 25)
+        .map((m) => ({
+          name: `Match #${m.match_number}: ${m.lobby_name}`,
+          value: String(m.id),
+        }));
+      await interaction.respond(suggestions);
+      return;
+    }
+
+    // Otherwise autocompleting team names
     const query = focused.value.toLowerCase();
     const suggestions = TeamGroupService.searchTeams(query, 25);
     await interaction.respond(suggestions.map((name) => ({ name, value: name })));
   },
 
   async execute(interaction: ChatInputCommandInteraction): Promise<void> {
-    const stake = interaction.options.getInteger('stake', true);
+    const rawStake = interaction.options.getInteger('stake');
+    const matchParam = interaction.options.getString('match');
 
-    const legsDraft: LegDraft[] = [];
+    // 1. Resolve match without requiring manual ID typing
+    const openMatches = MatchService.getOpenMatches();
+    let targetMatchId: number | null = null;
 
-    // Helper to extract leg
-    const addLegIfPresent = (legNum: number) => {
-      const matchId = interaction.options.getInteger(`match${legNum}`);
-      const market = interaction.options.getString(`market${legNum}`) as MarketType | null;
-      const pick = interaction.options.getString(`pick${legNum}`);
-
-      if (matchId && market && pick) {
-        legsDraft.push({
-          matchId,
-          marketType: market,
-          selectedTarget: pick.trim(),
-        });
+    if (matchParam) {
+      targetMatchId = parseInt(matchParam, 10);
+      if (isNaN(targetMatchId)) {
+        // Find match by name
+        const found = openMatches.find((m) => m.lobby_name.toLowerCase() === matchParam.toLowerCase());
+        if (found) targetMatchId = found.id;
       }
-    };
+    } else {
+      // Auto-default if 1 match open
+      if (openMatches.length === 1) {
+        targetMatchId = openMatches[0].id;
+      } else if (openMatches.length === 0) {
+        await interaction.reply({
+          content: '❌ There are currently no open matches available for prediction. Check back soon!',
+          ephemeral: true,
+        });
+        return;
+      } else {
+        // If multiple matches and no pick specified, offer buttons
+        if (!rawStake) {
+          const rows: ActionRowBuilder<ButtonBuilder>[] = [];
+          const actionRow = new ActionRowBuilder<ButtonBuilder>();
+          for (const m of openMatches.slice(0, 4)) {
+            actionRow.addComponents(
+              new ButtonBuilder()
+                .setCustomId(`btn_predict_match_${m.id}`)
+                .setLabel(`Predict Match #${m.match_number}`)
+                .setStyle(ButtonStyle.Success)
+                .setEmoji('🎯')
+            );
+          }
+          rows.push(actionRow);
+          await interaction.reply({
+            content: '⚠️ Multiple tournament lobbies are open! Click below to select which match you want to predict:',
+            components: rows,
+            ephemeral: true,
+          });
+          return;
+        }
 
-    addLegIfPresent(1);
-    addLegIfPresent(2);
-    addLegIfPresent(3);
-    addLegIfPresent(4);
-    addLegIfPresent(5);
+        await interaction.reply({
+          content: `⚠️ Multiple matches are open! Please pick one using the \`match\` option:\n${openMatches.map((m) => `• Match #${m.match_number}: **${m.lobby_name}**`).join('\n')}`,
+          ephemeral: true,
+        });
+        return;
+      }
+    }
+
+    const match = MatchService.getMatchById(targetMatchId!);
+    if (!match) {
+      await interaction.reply({ content: '❌ Selected match was not found or has expired.', ephemeral: true });
+      return;
+    }
+
+    // 2. Gather bracket picks
+    const brackets: { type: MarketType; label: string; pick: string | null }[] = [
+      { type: 'POS_1', label: '🥇 #1 (Winner)', pick: interaction.options.getString('pos_1') },
+      { type: 'POS_2_3', label: '🥈 #2 - #3', pick: interaction.options.getString('pos_2_3') },
+      { type: 'POS_3_5', label: '🎖️ #3 - #5', pick: interaction.options.getString('pos_3_5') },
+      { type: 'POS_5_10', label: '🎯 #5 - #10', pick: interaction.options.getString('pos_5_10') },
+      { type: 'POS_11_16', label: '💀 #11 - #16', pick: interaction.options.getString('pos_11_16') },
+    ];
+
+    const activePicks = brackets.filter((b) => b.pick && b.pick.trim().length > 0);
+
+    // If no stake or no picks passed, launch the interactive slip builder!
+    if (!rawStake || activePicks.length === 0) {
+      const builderUI = UserUI.buildSlipBuilder(match, undefined, undefined, rawStake || 200);
+      await interaction.reply({ embeds: [builderUI.embed], components: builderUI.rows, ephemeral: true });
+      return;
+    }
+
+    const stake = rawStake;
+
+    if (activePicks.length < 1) {
+      const builderUI = UserUI.buildSlipBuilder(match, undefined, undefined, rawStake || 200);
+      await interaction.reply({ embeds: [builderUI.embed], components: builderUI.rows, ephemeral: true });
+      return;
+    }
+
+    // 3. Rule: "one team cannot be repeated"
+    const chosenTeams = activePicks.map((p) => p.pick!.trim().toLowerCase());
+    const uniqueTeams = new Set(chosenTeams);
+    if (uniqueTeams.size !== chosenTeams.length) {
+      await interaction.reply({
+        content: '❌ **Rule Violation:** One team cannot be repeated in the same ticket! Each bracket must have a distinct team.',
+        ephemeral: true,
+      });
+      return;
+    }
+
+    const legsDraft: LegDraft[] = activePicks.map((p) => ({
+      matchId: match.id,
+      marketType: p.type,
+      selectedTarget: p.pick!.trim(),
+    }));
 
     try {
       const ticket = PredictionService.submitTicket(
@@ -130,33 +198,35 @@ export const predictCommand = {
       );
 
       const embed = new EmbedBuilder()
-        .setColor('#2ECC71')
-        .setTitle(`🎟️ Ticket #${ticket.id} Confirmed!`)
+        .setColor('#57F287')
+        .setTitle(`${SERVER_EMOJIS.VC_BADGE} Combo Slip #${ticket.id} Confirmed`)
         .setDescription(
-          `**${interaction.user.username}** locked in a **${ticket.legs?.length}-leg combo**!\n` +
-          `• **Staked:** \`${ticket.stake.toLocaleString()}\` coins\n` +
-          `• **Combo Weight:** \`${ticket.combo_weight}x\`\n` +
-          `• **Estimated Season Pool Multiplier:** \`${(ticket.combo_weight / ticket.stake).toFixed(2)}x\``
+          `Your prediction on **${match.lobby_name}** has been locked in!`
+        )
+        .addFields(
+          { name: '🪙 Stake', value: `\`${ticket.stake.toLocaleString()}\` coins`, inline: true },
+          { name: '⚡ Multiplier', value: `\`${(ticket.combo_weight / ticket.stake).toFixed(2)}x\``, inline: true },
+          { name: '🏟️ Lobby', value: `**${match.lobby_name}**`, inline: true }
         );
 
       ticket.legs?.forEach((leg, idx) => {
-        const match = MatchService.getMatchById(leg.match_id);
-        const matchName = match ? `Match #${match.match_number} (${match.lobby_name})` : `Match #${leg.match_id}`;
-        const marketLabel = leg.market_type === 'WINNER' ? '🥇 1st Place' : leg.market_type === 'TOP_3' ? '🥉 Top 3' : '🎯 Top Fragger';
+        const bracketObj = brackets.find((b) => b.type === leg.market_type);
+        const bracketLabel = bracketObj ? bracketObj.label : leg.market_type;
+        const teamFormatted = formatTeamWithEmoji(leg.selected_target, interaction.guild || undefined);
 
         embed.addFields({
-          name: `Leg ${idx + 1}: ${matchName}`,
-          value: `🎯 **${leg.selected_target}** (${marketLabel})\n📊 Odds: \`${leg.locked_odds}x\``,
+          name: `Leg ${idx + 1} • ${bracketLabel}`,
+          value: `${teamFormatted}\nOdds: \`${leg.locked_odds}x\``,
           inline: true,
         });
       });
 
-      embed.setFooter({ text: 'Stakes are locked in the season prize pool • Good luck!' });
+      embed.setFooter({ text: 'VC Arena • Track live in /tickets' });
 
       const copyButton = new ButtonBuilder()
         .setCustomId(`copy_ticket_${ticket.id}`)
-        .setLabel('Copy This Ticket')
-        .setStyle(ButtonStyle.Success)
+        .setLabel('Clone Slip')
+        .setStyle(ButtonStyle.Secondary)
         .setEmoji('📋');
 
       const row = new ActionRowBuilder<ButtonBuilder>().addComponents(copyButton);
@@ -167,7 +237,7 @@ export const predictCommand = {
         .setColor('#E74C3C')
         .setTitle('❌ Submission Failed')
         .setDescription(err.message || 'An error occurred while placing your combo ticket.')
-        .setFooter({ text: 'Use /matches to see open lobbies, valid team names, and IDs.' });
+        .setFooter({ text: 'Check available teams using autocomplete.' });
 
       await interaction.reply({ embeds: [errorEmbed], ephemeral: true });
     }

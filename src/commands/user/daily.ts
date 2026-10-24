@@ -1,5 +1,6 @@
 import { ChatInputCommandInteraction, EmbedBuilder, SlashCommandBuilder } from 'discord.js';
 import { MysteryBoxService } from '../../services/MysteryBoxService.js';
+import { SERVER_EMOJIS } from '../../utils/emojis.js';
 
 export const dailyCommand = {
   data: new SlashCommandBuilder()
@@ -10,10 +11,19 @@ export const dailyCommand = {
     try {
       const reward = MysteryBoxService.openBox(interaction.user.id, interaction.user.username);
 
+      let boxColor = '#2ECC71';
+      if (reward.tierName.includes('Jackpot') || reward.tierName.includes('LEGENDARY')) boxColor = '#F1C40F';
+      else if (reward.tierName.includes('Epic') || reward.tierName.includes('Titan')) boxColor = '#9B59B6';
+      else if (reward.tierName.includes('Rare')) boxColor = '#3498DB';
+
+      const streakStars = '🔥'.repeat(Math.min(reward.streakDays, 7));
+
       const embed = new EmbedBuilder()
-        .setColor('#2ECC71')
-        .setTitle(`${reward.tierEmoji} Mystery Box Opened!`)
-        .setDescription(`You cracked open a **${reward.tierName}**!`)
+        .setColor(boxColor as any)
+        .setTitle(`${reward.tierEmoji} Daily Mystery Crate Unboxed`)
+        .setDescription(
+          `**${interaction.user.username}** opened a **${reward.tierName}**!`
+        )
         .addFields(
           {
             name: '🎁 Base Loot',
@@ -21,30 +31,33 @@ export const dailyCommand = {
             inline: true,
           },
           {
-            name: `🔥 Day ${reward.streakDays} Streak Bonus`,
+            name: `🔥 Day ${reward.streakDays} Streak`,
             value: `+**${reward.streakBonus.toLocaleString()}** coins`,
             inline: true,
           },
           {
             name: '💰 Total Claimed',
-            value: `🎉 **+${reward.totalCoins.toLocaleString()}** coins!`,
-            inline: false,
+            value: `**+${reward.totalCoins.toLocaleString()}** coins`,
+            inline: true,
           },
           {
-            name: '⏰ Next Claim In',
+            name: '⏳ Next Crate',
             value: `<t:${Math.floor(reward.nextClaimTime / 1000)}:R>`,
             inline: true,
           }
         )
-        .setFooter({ text: 'Keep your daily streak going for up to +35% bonus coins!' });
+        .setFooter({ text: 'VC Arena • Daily crates reset every 24h' });
 
       await interaction.reply({ embeds: [embed] });
     } catch (err: any) {
       const embed = new EmbedBuilder()
         .setColor('#E74C3C')
-        .setTitle('⏳ Mystery Box On Cooldown')
-        .setDescription(err.message || 'Please wait before opening another box.')
-        .setFooter({ text: 'Daily boxes refresh every 24 hours.' });
+        .setTitle('⏳ Mystery Crate On Cooldown')
+        .setDescription(
+          `${err.message || 'Please wait before opening another box.'}\n\n` +
+          `💡 *Tip: Daily crates reset exactly 24 hours after your last claim!*`
+        )
+        .setFooter({ text: 'iGRI Fantasy Arena Supply Drops' });
 
       await interaction.reply({ embeds: [embed], ephemeral: true });
     }

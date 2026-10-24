@@ -1,6 +1,7 @@
 import { ChatInputCommandInteraction, EmbedBuilder, SlashCommandBuilder } from 'discord.js';
 import { UserService } from '../../services/UserService.js';
 import { FanService } from '../../services/FanService.js';
+import { SERVER_EMOJIS } from '../../utils/emojis.js';
 
 export const profileCommand = {
   data: new SlashCommandBuilder()
@@ -19,66 +20,64 @@ export const profileCommand = {
     const member = interaction.guild?.members.cache.get(targetUser.id);
     const teamRole = FanService.getUserTeamRole(member);
     const allegianceText = teamRole 
-      ? `🛡️ Crew Allegiance: <@&${teamRole.roleId}>\n` 
-      : '🛡️ Crew Allegiance: *Independent Analyst*\n';
+      ? `🛡️ **Crew Allegiance:** <@&${teamRole.roleId}>\n` 
+      : '🛡️ **Crew Allegiance:** *Independent Esports Analyst*\n';
 
     const accuracyPercent = user.resolved_selections > 0 
       ? ((user.correct_selections / user.resolved_selections) * 100).toFixed(1)
       : '0.0';
 
     const badges = inventory.map((item) => {
-      if (item === 'badge_sharpshooter') return '🎯 Sharpshooter';
-      if (item === 'badge_whale') return '🐋 Whale';
-      if (item === 'title_oracle') return '🔮 Oracle';
-      if (item === 'title_degen') return '🎲 High Roller';
-      if (item === 'title_champion') return '👑 Champion';
-      return `🏷️ ${item}`;
+      if (item === 'badge_sharpshooter') return '🎯 **Sharpshooter**';
+      if (item === 'badge_whale') return '🐋 **Whale**';
+      if (item === 'title_oracle') return '🔮 **Oracle**';
+      if (item === 'title_degen') return '🎲 **High Roller**';
+      if (item === 'title_champion') return '👑 **Champion**';
+      return `🏷️ **${item}**`;
     });
 
-    const badgeDisplay = badges.length > 0 ? badges.join(' • ') : '*No badges collected yet. Visit `/shop`!*';
+    const badgeDisplay = badges.length > 0 ? badges.join(' • ') : '*No vanity badges unlocked yet. Visit `/shop`!*';
 
     const embed = new EmbedBuilder()
       .setColor('#9B59B6')
-      .setTitle(`🏆 ${user.username}'s Arena Dossier`)
+      .setTitle(`${SERVER_EMOJIS.VC_BADGE} VC Arena • Profile: ${user.username}`)
       .setThumbnail(targetUser.displayAvatarURL())
       .setDescription(
-        `${allegianceText}` +
-        `Current Title: **${user.equipped_title}**\n` +
-        `Active Streak: **${user.daily_streak} days** 🔥`
+        (teamRole ? `Fan of <@&${teamRole.roleId}> • ` : '') +
+        `Title: \`${user.equipped_title}\` • Streak: **${user.daily_streak}d** 🔥`
       )
       .addFields(
         {
           name: '🪙 Balance',
-          value: `**${user.balance.toLocaleString()}** coins`,
+          value:
+            `• Available: **${user.balance.toLocaleString()}**\n` +
+            `• In Play: **${user.reserved_stake.toLocaleString()}**\n` +
+            `• Net Worth: **${(user.balance + user.reserved_stake).toLocaleString()}**`,
           inline: true,
         },
         {
-          name: '📈 Net Profit',
-          value: `**${user.lifetime_profit >= 0 ? '+' : ''}${user.lifetime_profit.toLocaleString()}** coins`,
+          name: '📊 Performance',
+          value:
+            `• Net Profit: **${user.lifetime_profit >= 0 ? '+' : ''}${user.lifetime_profit.toLocaleString()}**\n` +
+            `• Accuracy: **${accuracyPercent}%** (${user.correct_selections}/${user.resolved_selections})\n` +
+            `• Top Win: **${user.biggest_win_payout.toLocaleString()}**`,
           inline: true,
         },
         {
-          name: '🎯 Prediction Accuracy',
-          value: `**${accuracyPercent}%** (${user.correct_selections}/${user.resolved_selections} picks)`,
+          name: '🎲 Wagering Volume',
+          value:
+            `• Total Staked: **${user.lifetime_stakes.toLocaleString()}**\n` +
+            `• Total Won: **${user.lifetime_won_payouts.toLocaleString()}**\n` +
+            `• ROI: **${user.lifetime_stakes > 0 ? ((user.lifetime_won_payouts / user.lifetime_stakes) * 100).toFixed(1) : 0}%**`,
           inline: true,
         },
         {
-          name: '💰 Biggest Win',
-          value: `**${user.biggest_win_payout.toLocaleString()}** coins`,
-          inline: true,
-        },
-        {
-          name: '🎲 Total Staked',
-          value: `**${user.lifetime_stakes.toLocaleString()}** coins`,
-          inline: true,
-        },
-        {
-          name: '🏅 Trophies & Badges',
+          name: '🏅 Badges & Titles',
           value: badgeDisplay,
           inline: false,
         }
       )
-      .setFooter({ text: 'iGRI Fantasy Arena • FiveM Esports' });
+      .setFooter({ text: 'VC Arena • Player Profile' });
 
     await interaction.reply({ embeds: [embed] });
   },

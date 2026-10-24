@@ -1,6 +1,7 @@
 import { REST, Routes } from 'discord.js';
 import { config } from './config.js';
 import { adminCommand } from './commands/admin/admin.js';
+import { addBalanceCommand } from './commands/admin/addbalance.js';
 import { balanceCommand } from './commands/user/balance.js';
 import { dailyCommand } from './commands/user/daily.js';
 import { igriCommand } from './commands/user/igri.js';
@@ -15,6 +16,7 @@ import { helpCommand } from './commands/user/help.js';
 
 const commands = [
   adminCommand.data.toJSON(),
+  addBalanceCommand.data.toJSON(),
   balanceCommand.data.toJSON(),
   dailyCommand.data.toJSON(),
   fanbaseCommand.data.toJSON(),
@@ -46,11 +48,11 @@ async function deploy(): Promise<void> {
         { body: commands }
       );
       console.log(`✅ Successfully reloaded application commands for guild: ${config.discord.guildId}`);
-    } else {
-      // Global deployment
-      await rest.put(Routes.applicationCommands(config.discord.clientId), { body: commands });
-      console.log('✅ Successfully reloaded application commands globally.');
     }
+
+    // Global deployment so all users can access commands across Discord
+    await rest.put(Routes.applicationCommands(config.discord.clientId), { body: commands });
+    console.log('✅ Successfully reloaded application commands globally.');
   } catch (error) {
     console.error('❌ Failed to deploy commands:', error);
   }

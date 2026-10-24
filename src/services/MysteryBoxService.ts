@@ -1,5 +1,6 @@
 import { db } from '../database/db.js';
 import { UserService } from './UserService.js';
+import { AuditLogService } from './AuditLogService.js';
 
 export interface MysteryBoxReward {
   baseAmount: number;
@@ -118,7 +119,7 @@ export class MysteryBoxService {
 
     executeClaim();
 
-    return {
+    const reward: MysteryBoxReward = {
       baseAmount,
       streakBonus,
       totalCoins,
@@ -127,5 +128,9 @@ export class MysteryBoxService {
       streakDays: newStreak,
       nextClaimTime: now + this.COOLDOWN_MS,
     };
+
+    AuditLogService.logDailyClaim(userId, username, reward, user.balance + totalCoins).catch(() => {});
+
+    return reward;
   }
 }

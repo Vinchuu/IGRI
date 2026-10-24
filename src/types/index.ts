@@ -1,7 +1,13 @@
 export type MatchStatus = 'DRAFT' | 'OPEN' | 'LOCKED' | 'SETTLED' | 'CANCELLED';
 export type TicketStatus = 'SUBMITTED' | 'ACTIVE' | 'WON' | 'LOST' | 'REFUNDED';
 export type LegStatus = 'PENDING' | 'WON' | 'LOST' | 'VOID';
-export type MarketType = 'WINNER' | 'TOP_3' | 'TOP_FRAGGER';
+export type MarketType =
+  | 'POS_1'     // #1 Winner (Champion)
+  | 'POS_2_3'   // #2 - #3 (Podium)
+  | 'POS_3_5'   // #3 - #5 (Top 5)
+  | 'POS_5_10'  // #5 - #10 (Top 10)
+  | 'POS_6_10'  // #6 - #10 (Alias)
+  | 'POS_11_16'; // #11 - #16 (Placement)
 export type SeasonStatus = 'DRAFT' | 'ACTIVE' | 'SETTLED' | 'CANCELLED';
 
 export type TransactionType =
@@ -54,7 +60,8 @@ export interface Match {
   result_winner?: string; // 1st Place Team
   result_second?: string; // 2nd Place Team
   result_third?: string; // 3rd Place Team
-  result_top_fragger?: string; // Top fragger team or player
+  result_standings?: string[]; // Standings from 1st to 16th place
+  result_image_url?: string; // Proof screenshot of match standing/positions
   created_at: number;
 }
 

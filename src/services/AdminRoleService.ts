@@ -1,6 +1,7 @@
 import { PermissionFlagsBits } from 'discord.js';
 import { db } from '../database/db.js';
 import { config } from '../config.js';
+import { AuditLogService } from './AuditLogService.js';
 
 export class AdminRoleService {
   /**
@@ -14,11 +15,15 @@ export class AdminRoleService {
   /**
    * Adds a new role identifier (role name or role ID) to the admin access list
    */
-  static addAdminRole(roleIdentifier: string): boolean {
+  static addAdminRole(roleIdentifier: string, adminTag = 'Admin'): boolean {
     const info = db.prepare(`
       INSERT OR IGNORE INTO admin_roles (role_identifier, added_at)
       VALUES (?, ?)
     `).run(roleIdentifier.trim(), Date.now());
+
+    if (info.changes > 0) {
+      AuditLogService.logAdminRoleChange(adminTag, 'ADDED', roleIdentifier.trim()).catch(() => {});
+    }
 
     return info.changes > 0;
   }
@@ -26,8 +31,13 @@ export class AdminRoleService {
   /**
    * Removes a role identifier from the admin access list
    */
-  static removeAdminRole(roleIdentifier: string): boolean {
+  static removeAdminRole(roleIdentifier: string, adminTag = 'Admin'): boolean {
     const info = db.prepare('DELETE FROM admin_roles WHERE LOWER(role_identifier) = LOWER(?)').run(roleIdentifier.trim());
+
+    if (info.changes > 0) {
+      AuditLogService.logAdminRoleChange(adminTag, 'REMOVED', roleIdentifier.trim()).catch(() => {});
+    }
+
     return info.changes > 0;
   }
 

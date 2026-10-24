@@ -1,5 +1,6 @@
 import { db } from '../database/db.js';
 import { Match, MatchStatus, Season } from '../types/index.js';
+import { AuditLogService } from './AuditLogService.js';
 
 export class MatchService {
   /**
@@ -48,7 +49,10 @@ export class MatchService {
       now
     );
 
-    return this.getMatchById(Number(info.lastInsertRowid))!;
+    const match = this.getMatchById(Number(info.lastInsertRowid))!;
+    AuditLogService.logMatchCreated(match).catch(() => {});
+
+    return match;
   }
 
   /**

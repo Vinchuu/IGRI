@@ -2,6 +2,7 @@ import { db } from '../database/db.js';
 import { config } from '../config.js';
 import { UserAccount } from '../types/index.js';
 import { LedgerService } from './LedgerService.js';
+import { AuditLogService } from './AuditLogService.js';
 
 export class UserService {
   /**
@@ -68,5 +69,35 @@ export class UserService {
   static getUserInventory(userId: string): string[] {
     const items = db.prepare('SELECT item_id FROM user_inventory WHERE user_id = ?').all(userId) as { item_id: string }[];
     return items.map((i) => i.item_id);
+  }
+
+  /**
+   * Adds coins to a player's balance (Admin operation with ledger tracking)
+   */
+  static addBalance(
+    userId: string,
+    username: string,
+    amount: number,
+    adminId?: string,
+    reason?: string
+  ): { oldBalance: number; newBalance: number } {
+    if (amount <= 0) {
+      throw new Error('Amount to add must be greater than 0.');
+    }
+
+    const user = this.getOrCreateUser(userId, username);
+    const oldBalance = user.balance;
+
+    const newBalance = LedgerService.record(
+      userId,
+      'ADMIN_ADJUSTMENT',
+      amount,
+      adminId || null,
+      reason || 'Admin balance grant'
+    );
+
+    AuditLogService.logBalanceGrant(adminId, userId, username, amount, oldBalance, newBalance, reason).catch(() => {});
+
+    return { oldBalance, newBalance };
   }
 }

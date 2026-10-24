@@ -8,6 +8,7 @@ import {
 import { config } from './config.js';
 import { initDatabase, db } from './database/db.js';
 import { adminCommand } from './commands/admin/admin.js';
+import { addBalanceCommand } from './commands/admin/addbalance.js';
 import { balanceCommand } from './commands/user/balance.js';
 import { dailyCommand } from './commands/user/daily.js';
 import { igriCommand } from './commands/user/igri.js';
@@ -19,8 +20,10 @@ import { profileCommand } from './commands/user/profile.js';
 import { shopCommand } from './commands/user/shop.js';
 import { fanbaseCommand } from './commands/user/fanbase.js';
 import { helpCommand } from './commands/user/help.js';
-import { handleButtonInteraction, handleSelectMenuInteraction } from './interactions/buttonHandler.js';
+import { handleButtonInteraction, handleRoleSelectMenuInteraction, handleSelectMenuInteraction, handleModalInteraction, handleUserSelectMenuInteraction } from './interactions/buttonHandler.js';
+import { handleMessageCommand } from './handlers/messageHandler.js';
 import { MatchService } from './services/MatchService.js';
+import { AuditLogService } from './services/AuditLogService.js';
 
 console.log('⚡ Initializing iGRI Fantasy Arena Bot...');
 
@@ -33,14 +36,19 @@ const client = new Client({
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.GuildMembers,
+    GatewayIntentBits.MessageContent,
   ],
   partials: [Partials.Channel, Partials.Message],
 });
+
+// Initialize audit and activity logger
+AuditLogService.init(client);
 
 // Register slash commands into collection
 const commands = new Collection<string, any>();
 const commandList = [
   adminCommand,
+  addBalanceCommand,
   balanceCommand,
   dailyCommand,
   fanbaseCommand,
@@ -102,8 +110,28 @@ client.on('interactionCreate', async (interaction: Interaction) => {
       await handleSelectMenuInteraction(interaction);
       return;
     }
+
+    if (interaction.isRoleSelectMenu()) {
+      await handleRoleSelectMenuInteraction(interaction);
+      return;
+    }
+
+    if (interaction.isUserSelectMenu()) {
+      await handleUserSelectMenuInteraction(interaction);
+      return;
+    }
+
+    if (interaction.isModalSubmit()) {
+      await handleModalInteraction(interaction);
+      return;
+    }
   } catch (err: any) {
     console.error('Unhandled interaction error:', err);
+    AuditLogService.logSystemError('Interaction Error', err, {
+      id: interaction.user.id,
+      username: interaction.user.tag,
+    }).catch(() => {});
+
     const replyPayload = {
       content: `⚠️ An unexpected error occurred: ${err.message || 'Unknown error'}`,
       ephemeral: true,
@@ -116,6 +144,21 @@ client.on('interactionCreate', async (interaction: Interaction) => {
         await interaction.reply(replyPayload).catch(() => {});
       }
     }
+  }
+});
+
+// Message Prefix Command Dispatcher (for members without slash command permissions)
+client.on('messageCreate', async (message) => {
+  try {
+    await handleMessageCommand(message, client);
+  } catch (err: any) {
+    console.error('Unhandled message command error:', err);
+    AuditLogService.logSystemError('Message Command Error', err, {
+      id: message.author.id,
+      username: message.author.tag,
+    }).catch(() => {});
+
+    await message.reply(`⚠️ An unexpected error occurred: ${err.message || 'Unknown error'}`).catch(() => {});
   }
 });
 

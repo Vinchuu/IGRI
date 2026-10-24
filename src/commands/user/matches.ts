@@ -1,5 +1,13 @@
-import { ChatInputCommandInteraction, EmbedBuilder, SlashCommandBuilder } from 'discord.js';
+import {
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  ChatInputCommandInteraction,
+  EmbedBuilder,
+  SlashCommandBuilder,
+} from 'discord.js';
 import { MatchService } from '../../services/MatchService.js';
+import { SERVER_EMOJIS, formatTeamWithEmoji } from '../../utils/emojis.js';
 
 export const matchesCommand = {
   data: new SlashCommandBuilder()
@@ -10,34 +18,56 @@ export const matchesCommand = {
     const matches = MatchService.getOpenMatches();
 
     const embed = new EmbedBuilder()
-      .setColor('#00E676')
-      .setTitle('🎮 Upcoming iGRI Tournament Lobbies')
-      .setDescription('Place your combo predictions with `/predict` before the deadline strikes!');
+      .setColor('#3498DB')
+      .setTitle(`${SERVER_EMOJIS.VC_BADGE} VC Arena • Match Schedule`)
+      .setDescription(
+        `Open tournament lobbies ready for predictions. Lock in your slips before the deadline!`
+      );
 
     if (matches.length === 0) {
       embed.addFields({
-        name: 'No Active Lobbies Open',
-        value: 'All current matches are locked or settled. Check back soon for the next tournament day schedule!',
+        name: '⏳ No Active Matches',
+        value: 'All lobbies are currently locked or concluded. Admins will open the next match soon!',
       });
-    } else {
-      for (const m of matches) {
-        const deadlineTimestamp = Math.floor(m.deadline / 1000);
-        const scheduledTimestamp = Math.floor(m.scheduled_time / 1000);
+      await interaction.reply({ embeds: [embed] });
+      return;
+    }
 
-        embed.addFields({
-          name: `📍 Match #${m.match_number}: ${m.lobby_name} [ID: ${m.id}]`,
-          value:
-            `• **Starts:** <t:${scheduledTimestamp}:t> (<t:${scheduledTimestamp}:R>)\n` +
-            `• **Locks:** <t:${deadlineTimestamp}:R>\n` +
-            `• **Teams (${m.participating_teams.length}):** ${m.participating_teams.join(', ')}\n` +
-            `• **Available Markets:** \`1st Place (Winner)\`, \`Top 3 Finish\`, \`Top Fragger\``,
-          inline: false,
-        });
+    const actionRow = new ActionRowBuilder<ButtonBuilder>();
+
+    for (const m of matches) {
+      const deadlineTimestamp = Math.floor(m.deadline / 1000);
+
+      const teamListFormatted = m.participating_teams
+        .slice(0, 10)
+        .map((t) => formatTeamWithEmoji(t))
+        .join(', ') + (m.participating_teams.length > 10 ? ` *+${m.participating_teams.length - 10} more*` : '');
+
+      embed.addFields({
+        name: `🎮 Match #${m.match_number} • ${m.lobby_name}`,
+        value:
+          `• **Closes:** <t:${deadlineTimestamp}:R> (<t:${deadlineTimestamp}:t>)\n` +
+          `• **Teams (${m.participating_teams.length}):** ${teamListFormatted}`,
+        inline: false,
+      });
+
+      if (actionRow.components.length < 4) {
+        actionRow.addComponents(
+          new ButtonBuilder()
+            .setCustomId(`btn_predict_match_${m.id}`)
+            .setLabel(`Predict #${m.match_number}`)
+            .setStyle(ButtonStyle.Success)
+            .setEmoji('🎯')
+        );
       }
     }
 
-    embed.setFooter({ text: 'Tip: Combine 2 to 5 distinct matches for a combo ticket!' });
+    actionRow.addComponents(
+      new ButtonBuilder().setCustomId('user_ui_home').setLabel('Hub').setStyle(ButtonStyle.Secondary).setEmoji('🏠')
+    );
 
-    await interaction.reply({ embeds: [embed] });
+    embed.setFooter({ text: 'VC Arena • Select a match to predict' });
+
+    await interaction.reply({ embeds: [embed], components: [actionRow] });
   },
 };

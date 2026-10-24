@@ -1,17 +1,45 @@
 import { Guild } from 'discord.js';
 
 /**
- * Known custom server emojis for iGRI tournament teams in VC Hangout
+ * Server branding & decorative emojis from VC Hangout
+ */
+export const SERVER_EMOJIS = {
+  VC_BADGE: '<:gta:1561396472761815110>',
+  GTA_BADGE: '<:gta:1561396472761815110>',
+  VC_ANIMATED: '<a:vc:1485209555733450763>',
+  VC_FIRE: '<a:vc:1491319966123692143>',
+  VC_HEART: '<:vc_heart:1485214028820385912>',
+  ROLE: '<:role:1485216932302159932>',
+  CHAD: '<:chad:1485214321775612034>',
+  COIN: '🪙',
+  TROPHY: '🏆',
+  MEDAL_1: '🥇',
+  MEDAL_2: '🥈',
+  MEDAL_3: '🥉',
+  FIRE: '🔥',
+  LOCK: '🔒',
+  CHECK: '✅',
+  CROSS: '❌',
+  TARGET: '🎯',
+  SKULL: '💀',
+};
+
+/**
+ * Known custom server emojis for all 46 iGRI tournament teams in VC Hangout
  */
 export const TEAM_EMOJIS: Record<string, string> = {
   'NXT8': '<:NXT8:1560698029701468210>',
   'No Rules': '<:NoRules:1560697704412348507>',
+  'No rules': '<:NoRules:1560697704412348507>',
   'REDLINE': '<:RedLine:1560697302946029670>',
   'Redline': '<:RedLine:1560697302946029670>',
   'Washed out': '<:WashedOut:1560697930980007966>',
+  'Washed Out': '<:WashedOut:1560697930980007966>',
   'Mangalyaan': '<:Mangalyan:1560697876685000765>',
   'Red network': '<:RedNetwork:1560697571972878436>',
+  'Red Network': '<:RedNetwork:1560697571972878436>',
   'Pew Pew': '<:PewPew:1560697803116646512>',
+  'Pew pew': '<:PewPew:1560697803116646512>',
   'Guns n roses': '<:GunsnRoses:1560697744195190914>',
   'Guns N Roses': '<:GunsnRoses:1560697744195190914>',
   'Sayless': '<:SayLess:1560697686435434617>',
@@ -19,6 +47,7 @@ export const TEAM_EMOJIS: Record<string, string> = {
   'Black reign': '<:BlackReign:1560697637580316824>',
   'Black Reign': '<:BlackReign:1560697637580316824>',
   'Pookie.Exe': '<:Pookie:1560703420573294754>',
+  'Pookie.exe': '<:Pookie:1560703420573294754>',
   'Wardogs': '<:WarDogs:1560697537457819698>',
   'WarDogs': '<:WarDogs:1560697537457819698>',
   'No limit': '<:NoLimit:1560697501802168340>',
@@ -31,6 +60,7 @@ export const TEAM_EMOJIS: Record<string, string> = {
   '2Fast': '<:2Fast:1560687385723801700>',
   'W Esports': '<:W_Esports:1560705981804187689>',
   'Team Healers': '<:TeamHealers:1560687351653601340>',
+  'Team healers': '<:TeamHealers:1560687351653601340>',
   'Underlords': '<:UnderLords:1560687310318608534>',
   'Nothing2lose': '<:N2L:1560687270804332564>',
   'Kalyug': '<:Kalyug:1560687233252458526>',
@@ -68,13 +98,30 @@ export const TEAM_EMOJIS: Record<string, string> = {
   'Low FPS': '<:LFS:1560686536532557915>',
   'Road killers': '<:RK:1560686460028457121>',
   'Road Killers': '<:RK:1560686460028457121>',
+  'Battak Bna Denge': '<:BBD:1560686381892632717>',
+  'Battak bna denge': '<:BBD:1560686381892632717>',
+  'New Limit Stars': '<:NLS:1560686354470277221>',
+  'New limit stars': '<:NLS:1560686354470277221>',
+  'CK': '<:CK:1560697466440122429>',
+  'Ck': '<:CK:1560697466440122429>',
+  'Contract Killers': '<:CK:1560697466440122429>',
+  'TDS': '<:TDS:1560697421061693580>',
+  'Tds': '<:TDS:1560697421061693580>',
+  'The Dark Shadows': '<:TDS:1560697421061693580>',
+  'GenZ': '<:GenZ:1560697575550488626>',
+  'Genz': '<:GenZ:1560697575550488626>',
+  'GENZ': '<:GenZ:1560697575550488626>',
+  'Justchill': '<:JC:1560687113098371303>',
+  'Invictuz': '<:1Z:1560687464643829943>',
+  '2 Fast': '<:2Fast:1560687385723801700>',
+  "Gun's N Roses": '<:GunsnRoses:1560697744195190914>',
+  "Gun's n Roses": '<:GunsnRoses:1560697744195190914>',
 };
 
 /**
- * Returns formatted team name with its custom Discord server emoji if available
+ * Returns formatted team string with custom server logo
  */
 export function formatTeamWithEmoji(teamName: string, guild?: Guild): string {
-  // Check predefined map first
   const normalized = Object.keys(TEAM_EMOJIS).find(
     (k) => k.toLowerCase().trim() === teamName.toLowerCase().trim()
   );
@@ -82,10 +129,11 @@ export function formatTeamWithEmoji(teamName: string, guild?: Guild): string {
     return `${TEAM_EMOJIS[normalized]} **${teamName}**`;
   }
 
-  // Fallback: search in guild emojis
+  // Fallback: search guild emojis by stripped name
   if (guild) {
+    const cleanName = teamName.toLowerCase().replace(/[^a-z0-9]/g, '');
     const found = guild.emojis.cache.find(
-      (e) => e.name?.toLowerCase().trim() === teamName.toLowerCase().replace(/\s+/g, '').trim()
+      (e) => e.name?.toLowerCase().replace(/[^a-z0-9]/g, '') === cleanName
     );
     if (found) {
       return `${found.toString()} **${teamName}**`;
@@ -93,4 +141,28 @@ export function formatTeamWithEmoji(teamName: string, guild?: Guild): string {
   }
 
   return `🛡️ **${teamName}**`;
+}
+
+/**
+ * Returns raw emoji string (e.g. <:1Z:1560687464643829943> or 🛡️)
+ */
+export function getTeamEmoji(teamName: string): string {
+  const normalized = Object.keys(TEAM_EMOJIS).find(
+    (k) => k.toLowerCase().trim() === teamName.toLowerCase().trim()
+  );
+  return normalized && TEAM_EMOJIS[normalized] ? TEAM_EMOJIS[normalized] : '🛡️';
+}
+
+/**
+ * Returns custom emoji ID if available (for Discord Select Menu option icons)
+ */
+export function getTeamEmojiId(teamName: string): string | null {
+  const normalized = Object.keys(TEAM_EMOJIS).find(
+    (k) => k.toLowerCase().trim() === teamName.toLowerCase().trim()
+  );
+  if (normalized && TEAM_EMOJIS[normalized]) {
+    const match = TEAM_EMOJIS[normalized].match(/:(\d+)>$/);
+    if (match) return match[1];
+  }
+  return null;
 }

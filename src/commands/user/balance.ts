@@ -1,6 +1,7 @@
 import { ChatInputCommandInteraction, EmbedBuilder, SlashCommandBuilder } from 'discord.js';
 import { LedgerService } from '../../services/LedgerService.js';
 import { UserService } from '../../services/UserService.js';
+import { SERVER_EMOJIS } from '../../utils/emojis.js';
 
 export const balanceCommand = {
   data: new SlashCommandBuilder()
@@ -13,56 +14,73 @@ export const balanceCommand = {
 
     const embed = new EmbedBuilder()
       .setColor('#F1C40F')
-      .setTitle(`💳 ${user.username}'s Arena Wallet`)
-      .setDescription(`Equipped Title: **${user.equipped_title}**`)
+      .setTitle(`${SERVER_EMOJIS.VC_BADGE} VC Arena • Wallet & Stats`)
+      .setDescription(
+        `**${user.username}** • Title: \`${user.equipped_title}\` • Streak: **${user.daily_streak}d** 🔥`
+      )
       .addFields(
         {
-          name: '🪙 Available Balance',
+          name: '🪙 Balance',
           value: `**${user.balance.toLocaleString()}** coins`,
           inline: true,
         },
         {
-          name: '🔒 Reserved on Tickets',
+          name: '🔒 In Play',
           value: `**${user.reserved_stake.toLocaleString()}** coins`,
           inline: true,
         },
         {
-          name: '💼 Total Net Worth',
+          name: '💼 Net Worth',
           value: `**${(user.balance + user.reserved_stake).toLocaleString()}** coins`,
           inline: true,
         },
         {
-          name: '📈 Lifetime Net Profit',
-          value: `${user.lifetime_profit >= 0 ? '+' : ''}${user.lifetime_profit.toLocaleString()} coins`,
+          name: '📈 Net Profit',
+          value: `**${user.lifetime_profit >= 0 ? '+' : ''}${user.lifetime_profit.toLocaleString()}** coins`,
           inline: true,
         },
         {
           name: '🎯 Accuracy',
           value: user.resolved_selections > 0 
-            ? `${((user.correct_selections / user.resolved_selections) * 100).toFixed(1)}% (${user.correct_selections}/${user.resolved_selections})`
-            : 'No picks resolved yet',
+            ? `**${((user.correct_selections / user.resolved_selections) * 100).toFixed(1)}%** (${user.correct_selections}/${user.resolved_selections})`
+            : '*No picks yet*',
           inline: true,
         },
         {
-          name: '🏆 Biggest Combo Payout',
-          value: `${user.biggest_win_payout.toLocaleString()} coins`,
+          name: '🏆 Top Win',
+          value: `**${user.biggest_win_payout.toLocaleString()}** coins`,
           inline: true,
         }
       );
 
     if (history.length > 0) {
+      const typeIcons: Record<string, string> = {
+        STARTING_GRANT: '🎁 Welcome Bonus',
+        DAILY_REWARD: '📦 Daily Crate',
+        TICKET_STAKE: '🎟️ Slip Placed',
+        TICKET_PAYOUT: '🎉 Slip Won',
+        TICKET_REFUND: '↩️ Void Leg / Refund',
+        ADMIN_ADJUSTMENT: '👑 Admin Grant',
+        SHOP_PURCHASE: '🛍️ Shop Item',
+      };
+
       const historyText = history
         .map((h) => {
           const sign = h.amount > 0 ? '+' : '';
           const time = `<t:${Math.floor(h.created_at / 1000)}:R>`;
-          return `• \`${sign}${h.amount.toLocaleString()}\` coins — **${h.type}** (${time})\n  *${h.notes || 'No description'}*`;
+          const label = typeIcons[h.type] || h.type;
+          return `• **${label}**: \`${sign}${h.amount.toLocaleString()}\` coins • ${time}`;
         })
         .join('\n');
 
-      embed.addFields({ name: '📜 Recent Transactions', value: historyText });
+      embed.addFields({
+        name: '📜 Recent Transactions',
+        value: historyText,
+        inline: false,
+      });
     }
 
-    embed.setFooter({ text: 'iGRI Fantasy Arena • Strictly Virtual Currency' });
+    embed.setFooter({ text: 'VC Arena • Virtual Currency • Zero real-money value' });
 
     await interaction.reply({ embeds: [embed] });
   },

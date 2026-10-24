@@ -4,6 +4,7 @@ import { MarketType, Ticket, TicketLeg } from '../types/index.js';
 import { MatchService } from './MatchService.js';
 import { OddsService } from './OddsService.js';
 import { UserService } from './UserService.js';
+import { AuditLogService } from './AuditLogService.js';
 
 export interface LegDraft {
   matchId: number;
@@ -25,35 +26,41 @@ export class PredictionService {
     const user = UserService.getOrCreateUser(userId, username);
     const season = MatchService.getActiveSeason();
 
-    // 1. Validate combo size
+    // 1. Validate combo size (1 to 5 selections)
     if (legsDraft.length < config.economy.minComboSize || legsDraft.length > config.economy.maxComboSize) {
-      throw new Error(`A combo ticket must contain between ${config.economy.minComboSize} and ${config.economy.maxComboSize} selections.`);
+      throw new Error(`A ticket must contain between ${config.economy.minComboSize} and ${config.economy.maxComboSize} selections.`);
     }
 
-    // 2. Validate distinct matches (cannot pick two markets for the same match)
-    const matchIds = new Set(legsDraft.map((l) => l.matchId));
-    if (matchIds.size !== legsDraft.length) {
-      throw new Error('Each selection in a combo ticket must be from a distinct match.');
+    // 2. Validate NO REPEATED TEAMS in the slip: "one team cannot be repeated"
+    const selectedTeams = new Set(legsDraft.map((l) => l.selectedTarget.toLowerCase().trim()));
+    if (selectedTeams.size !== legsDraft.length) {
+      throw new Error('One team cannot be repeated! You must pick a distinct team for each bracket position.');
     }
 
-    // 3. Validate stake limits
+    // 3. Validate distinct brackets for the same match
+    const matchMarketCombos = new Set(legsDraft.map((l) => `${l.matchId}_${l.marketType}`));
+    if (matchMarketCombos.size !== legsDraft.length) {
+      throw new Error('You cannot pick the same position bracket multiple times in the same match.');
+    }
+
+    // 4. Validate stake limits
     if (stake < config.economy.minTicketStake || stake > config.economy.maxTicketStake) {
       throw new Error(`Stake must be between ${config.economy.minTicketStake} and ${config.economy.maxTicketStake} coins.`);
     }
 
-    // 4. Validate open stake limit (max 3,000 across all unresolved tickets)
+    // 5. Validate open stake limit (max 3,000 across all unresolved tickets)
     if (user.reserved_stake + stake > config.economy.maxOpenStakeLimit) {
       throw new Error(
         `Open stake limit exceeded! Current open: ${user.reserved_stake} coins. Max allowed: ${config.economy.maxOpenStakeLimit} coins.`
       );
     }
 
-    // 5. Validate user balance
+    // 6. Validate user balance
     if (user.balance < stake) {
       throw new Error(`Insufficient balance! You have ${user.balance} coins, but tried to stake ${stake}.`);
     }
 
-    // 6. Validate each match is still OPEN and deadline has not passed
+    // 7. Validate each match is still OPEN and deadline has not passed
     const now = Date.now();
     const legsToInsert: { matchId: number; marketType: MarketType; target: string; odds: number }[] = [];
     let multiplierProduct = 1.0;
@@ -68,13 +75,11 @@ export class PredictionService {
         throw new Error(`Match #${match.match_number} (${match.lobby_name}) is already locked or closed for predictions.`);
       }
 
-      // Validate target is in participating teams / players
-      const validTargets = draft.marketType === 'TOP_FRAGGER' 
-        ? [...match.participating_teams, ...(match.participating_players || [])]
-        : match.participating_teams;
+      // Validate target is in participating teams
+      const validTargets = match.participating_teams;
 
-      if (!validTargets.includes(draft.selectedTarget)) {
-        throw new Error(`"${draft.selectedTarget}" is not a valid option for Match #${match.match_number}.`);
+      if (!validTargets.some((t) => t.toLowerCase().trim() === draft.selectedTarget.toLowerCase().trim())) {
+        throw new Error(`"${draft.selectedTarget}" is not a valid team in Match #${match.match_number}.`);
       }
 
       const odds = OddsService.getOdds(match.id, draft.marketType, draft.selectedTarget, match.participating_teams.length);
@@ -129,7 +134,10 @@ export class PredictionService {
 
     executeSubmission();
 
-    return this.getTicketById(createdTicketId)!;
+    const createdTicket = this.getTicketById(createdTicketId)!;
+    AuditLogService.logTicketPlaced(createdTicket, username).catch(() => {});
+
+    return createdTicket;
   }
 
   /**
@@ -177,5 +185,41 @@ export class PredictionService {
     }
 
     return tickets;
+  }
+
+  /**
+   * Submits multiple independent single-bracket tickets atomically.
+   */
+  static submitMultipleSingleTickets(
+    userId: string,
+    username: string,
+    bets: { matchId: number; marketType: MarketType; selectedTarget: string; stake: number }[]
+  ): Ticket[] {
+    const user = UserService.getOrCreateUser(userId, username);
+    const totalStake = bets.reduce((sum, b) => sum + b.stake, 0);
+
+    if (user.balance < totalStake) {
+      throw new Error(`Insufficient balance! You need ${totalStake.toLocaleString()} coins, but currently have ${user.balance.toLocaleString()} coins.`);
+    }
+
+    if (user.reserved_stake + totalStake > config.economy.maxOpenStakeLimit) {
+      throw new Error(
+        `Open stake limit exceeded! Current open: ${user.reserved_stake} coins. Total with new bets: ${user.reserved_stake + totalStake} coins. Max allowed: ${config.economy.maxOpenStakeLimit} coins.`
+      );
+    }
+
+    const createdTickets: Ticket[] = [];
+    for (const b of bets) {
+      const ticket = this.submitTicket(userId, username, b.stake, [
+        {
+          matchId: b.matchId,
+          marketType: b.marketType,
+          selectedTarget: b.selectedTarget,
+        },
+      ]);
+      createdTickets.push(ticket);
+    }
+
+    return createdTickets;
   }
 }

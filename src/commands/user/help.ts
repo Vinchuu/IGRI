@@ -6,6 +6,7 @@ import {
   EmbedBuilder,
   SlashCommandBuilder,
 } from 'discord.js';
+import { SERVER_EMOJIS } from '../../utils/emojis.js';
 
 export const helpCommand = {
   data: new SlashCommandBuilder()
@@ -14,52 +15,51 @@ export const helpCommand = {
 
   async execute(interaction: ChatInputCommandInteraction): Promise<void> {
     const embed = new EmbedBuilder()
-      .setColor('#00E676')
-      .setTitle('🎮 iGRI Fantasy Arena — Official Player Guide')
+      .setColor('#5865F2')
+      .setTitle(`${SERVER_EMOJIS.VC_BADGE} VC Arena • How to Play`)
       .setDescription(
-        '**Welcome to the ultimate FiveM Esports Prediction Arena!**\n' +
-        'Compete against other server members by predicting tournament results, building multi-match combo tickets, and climbing the leaderboard for seasonal glory.\n\n' +
-        '🪙 **Starting Balance:** Every new player receives **10,000 Virtual Coins** upon joining!\n' +
-        '*(Coins are strictly virtual and hold no real-world monetary value)*'
+        `Predict tournament match results, build slips, and climb the leaderboard!\n` +
+        `All players receive **10,000 virtual coins** to start.`
       )
       .addFields(
         {
-          name: '🎯 1. How Prediction Markets Work',
+          name: '🎯 1. Position Markets',
           value:
-            '• **🥇 1st Place (Winner):** Predict which crew takes #1 (WWCD) in the lobby.\n' +
-            '• **🥉 Top 3 Finish:** Predict a crew to finish on the podium (1st, 2nd, or 3rd).\n' +
-            '• **🔥 Top Fragger:** Predict the player or squad with the most kills in the match.',
+            '• **🥇 #1 Winner:** Match champion (highest multiplier)\n' +
+            '• **🥈 #2 - #3:** Finishes in top 2 or 3\n' +
+            '• **🥉 #3 - #5:** Finishes between 3rd and 5th\n' +
+            '• **🎯 #5 - #10:** Finishes in top 10\n' +
+            '• **💀 #11 - #16:** Finishes in 11th to 16th',
           inline: false,
         },
         {
-          name: '🎟️ 2. Combo Slips & Multipliers',
+          name: '🎟️ 2. Prediction Modes',
           value:
-            '• Each ticket must combine **2 to 5 distinct matches**.\n' +
-            '• Stake between **50 and 1,000 coins** per ticket (max 3,000 open stakes at once).\n' +
-            '• Payouts use **closing combo weights**: every hit multiplies your potential share of the season prize pool!',
+            '• **🎯 Single Bets:** Place separate stakes per bracket (e.g. 1k on #1, 500 on #2). Each position wins independently!\n' +
+            '• **🔥 Combo Parlay:** Combine 2-5 positions for multiplied odds.\n' +
+            '• **Stakes:** 100 to 1,000 coins (or enter any custom amount).',
           inline: false,
         },
         {
-          name: '🛡️ 3. The Void Leg (Push) Protection',
+          name: '🛡️ 3. Push Protection',
           value:
-            'If a FiveM match crashes, cancels, or reschedules, **your entire ticket does NOT fail!**\n' +
-            'That specific leg’s odds automatically downgrade to `1.0x` (Push), preserving the rest of your winning combo.',
+            'If a match lobby cancels or reschedules, that leg automatically pushes at `1.0x` odds so the rest of your combo remains safe.',
           inline: false,
         },
         {
-          name: '🎁 4. Daily Rewards & Economy',
+          name: '🎁 4. Daily Crates & Shop',
           value:
-            '• Claim your **Daily Mystery Box** every 24 hours with `/daily`.\n' +
-            '• Win up to **2,500 coins** + daily streak multipliers (up to +35% bonus)!\n' +
-            '• Spend surplus coins in the `/shop` on custom titles and server badges.',
+            '• Claim your free **Daily Crate** every 24 hours (`/daily` or `!daily`).\n' +
+            '• Unlock server titles, badges, and roles in the `/shop`.',
           inline: false,
         }
       )
-      .setFooter({ text: 'Click the buttons below to explore full command lists & guides!' });
+      .setFooter({ text: 'VC Arena • Virtual Currency • Zero typing required' });
 
     const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-      new ButtonBuilder().setCustomId('help_player_cmds').setLabel('Player Commands').setStyle(ButtonStyle.Primary).setEmoji('🎮'),
-      new ButtonBuilder().setCustomId('help_fanbase_guide').setLabel('Crew Allegiance').setStyle(ButtonStyle.Secondary).setEmoji('🛡️'),
+      new ButtonBuilder().setCustomId('user_ui_home').setLabel('Hub').setStyle(ButtonStyle.Success).setEmoji('🏠'),
+      new ButtonBuilder().setCustomId('help_player_cmds').setLabel('Commands').setStyle(ButtonStyle.Primary).setEmoji('🎮'),
+      new ButtonBuilder().setCustomId('help_fanbase_guide').setLabel('Allegiance').setStyle(ButtonStyle.Secondary).setEmoji('🛡️'),
       new ButtonBuilder().setCustomId('help_admin_guide').setLabel('Admin Guide').setStyle(ButtonStyle.Secondary).setEmoji('⚙️')
     );
 

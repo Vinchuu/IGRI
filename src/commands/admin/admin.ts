@@ -1,21 +1,32 @@
 import {
+  ActionRowBuilder,
   AutocompleteInteraction,
   ChatInputCommandInteraction,
   EmbedBuilder,
   PermissionFlagsBits,
+  RoleSelectMenuBuilder,
   SlashCommandBuilder,
 } from 'discord.js';
 import { db } from '../../database/db.js';
 import { MatchService } from '../../services/MatchService.js';
 import { SettlementService } from '../../services/SettlementService.js';
+import { NotificationService } from '../../services/NotificationService.js';
 import { TeamGroupService } from '../../services/TeamGroupService.js';
 import { AdminRoleService } from '../../services/AdminRoleService.js';
+import { FanService } from '../../services/FanService.js';
+import { UserService } from '../../services/UserService.js';
+import { AdminUI } from '../../ui/AdminUI.js';
+import { formatTeamWithEmoji, SERVER_EMOJIS } from '../../utils/emojis.js';
 
 export const adminCommand = {
   data: new SlashCommandBuilder()
     .setName('admin')
     .setDescription('iGRI Tournament Administrator suite')
-    .setDefaultMemberPermissions(PermissionFlagsBits.SendMessages) // Let our service check custom roles (., ..., Crew)
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+
+    // Subcommand: Interactive Admin Panel
+    .addSubcommand((sub) => sub.setName('panel').setDescription('Open the Interactive Tournament Operations Panel'))
+    .addSubcommand((sub) => sub.setName('pannel').setDescription('Open the Interactive Tournament Operations Panel (alias)'))
 
     // Subcommand: Match Create with Custom Teams
     .addSubcommand((sub) =>
@@ -36,12 +47,6 @@ export const adminCommand = {
             .setDescription('Minutes from now until prediction market locks')
             .setRequired(true)
             .setMinValue(1)
-        )
-        .addStringOption((opt) =>
-          opt
-            .setName('players')
-            .setDescription('Optional comma-separated star fraggers (defaults to teams list if omitted)')
-            .setRequired(false)
         )
     )
 
@@ -102,25 +107,48 @@ export const adminCommand = {
     .addSubcommand((sub) =>
       sub
         .setName('result')
-        .setDescription('Declare official match placements & top fragger to resolve tickets immediately')
-        .addIntegerOption((opt) => opt.setName('match_id').setDescription('ID of the match to settle').setRequired(true))
-        .addStringOption((opt) => opt.setName('winner_1st').setDescription('1st Place winning team').setRequired(true).setAutocomplete(true))
-        .addStringOption((opt) => opt.setName('second_2nd').setDescription('2nd Place podium team').setRequired(true).setAutocomplete(true))
-        .addStringOption((opt) => opt.setName('third_3rd').setDescription('3rd Place podium team').setRequired(true).setAutocomplete(true))
-        .addStringOption((opt) => opt.setName('top_fragger').setDescription('Top Fragger (player or team)').setRequired(true).setAutocomplete(true))
+        .setDescription('Declare official match placements to resolve tickets immediately')
+        .addStringOption((opt) =>
+          opt
+            .setName('match')
+            .setDescription('Select match to settle (auto-selects if only 1 match is active)')
+            .setRequired(false)
+            .setAutocomplete(true)
+        )
+        .addStringOption((opt) =>
+          opt
+            .setName('standings')
+            .setDescription('Placements 1st to 16th comma-separated (e.g. NXT8, REDLINE, Pew Pew, ...)')
+            .setRequired(false)
+        )
+        .addStringOption((opt) => opt.setName('winner_1st').setDescription('1st Place winning team').setRequired(false).setAutocomplete(true))
+        .addStringOption((opt) => opt.setName('second_2nd').setDescription('2nd Place podium team').setRequired(false).setAutocomplete(true))
+        .addStringOption((opt) => opt.setName('third_3rd').setDescription('3rd Place podium team').setRequired(false).setAutocomplete(true))
+        .addAttachmentOption((opt) =>
+          opt
+            .setName('standing_pic')
+            .setDescription('Extra: Upload photo/screenshot of match standing or positions scoreboard')
+            .setRequired(false)
+        )
+        .addStringOption((opt) =>
+          opt
+            .setName('pic_url')
+            .setDescription('Extra: Or paste image web URL of match standing/positions')
+            .setRequired(false)
+        )
     )
 
-    // Subcommand: Group Set
+    // Subcommand: Group Set (Role Selector or Mention Roles)
     .addSubcommand((sub) =>
       sub
         .setName('group-set')
-        .setDescription('Assign teams to a tournament group (e.g. Group A)')
+        .setDescription('Assign team roles to a tournament group (e.g. Group A)')
         .addStringOption((opt) => opt.setName('group_name').setDescription('Name of the group (e.g. Group A)').setRequired(true))
         .addStringOption((opt) =>
           opt
-            .setName('teams')
-            .setDescription('Comma-separated list of teams to assign to this group')
-            .setRequired(true)
+            .setName('roles')
+            .setDescription('Optional: Mention roles (@NXT8 @REDLINE...) or leave blank for role dropdown menu')
+            .setRequired(false)
         )
     )
 
@@ -173,7 +201,13 @@ export const adminCommand = {
       sub
         .setName('cancel')
         .setDescription('Cancel a match and trigger the Void Leg (Push) rule or refund')
-        .addIntegerOption((opt) => opt.setName('match_id').setDescription('ID of the match to cancel').setRequired(true))
+        .addStringOption((opt) =>
+          opt
+            .setName('match')
+            .setDescription('Select match to cancel (auto-selects if only 1 match is active)')
+            .setRequired(false)
+            .setAutocomplete(true)
+        )
         .addStringOption((opt) => opt.setName('reason').setDescription('Reason for cancellation').setRequired(false))
     )
 
@@ -186,11 +220,42 @@ export const adminCommand = {
     )
 
     // Subcommand: Audit
-    .addSubcommand((sub) => sub.setName('audit').setDescription('Inspect coin pool integrity and recent transactions')),
+    .addSubcommand((sub) => sub.setName('audit').setDescription('Inspect coin pool integrity and recent transactions'))
+
+    // Subcommand: Add Balance to Player
+    .addSubcommand((sub) =>
+      sub
+        .setName('add-balance')
+        .setDescription('Add virtual coins to a player account')
+        .addUserOption((opt) => opt.setName('user').setDescription('Player to receive coins').setRequired(true))
+        .addIntegerOption((opt) => opt.setName('amount').setDescription('Amount of coins to add').setRequired(true).setMinValue(1))
+        .addStringOption((opt) => opt.setName('reason').setDescription('Reason for granting coins (optional)').setRequired(false))
+    ),
 
   async autocomplete(interaction: AutocompleteInteraction): Promise<void> {
     const focused = interaction.options.getFocused(true);
     const query = focused.value.toLowerCase();
+
+    if (focused.name === 'match') {
+      const season = MatchService.getActiveSeason();
+      const matches = MatchService.getAllSeasonMatches(season.id).filter(
+        (m) => m.status === 'OPEN' || m.status === 'LOCKED'
+      );
+      const filtered = matches.filter(
+        (m) =>
+          m.lobby_name.toLowerCase().includes(query) ||
+          m.match_number.toString().includes(query) ||
+          m.id.toString().includes(query)
+      );
+      await interaction.respond(
+        filtered.slice(0, 25).map((m) => ({
+          name: `Match #${m.match_number}: ${m.lobby_name} [${m.status}]`,
+          value: String(m.id),
+        }))
+      );
+      return;
+    }
+
     const suggestions = TeamGroupService.searchTeams(query, 25);
     await interaction.respond(suggestions.map((name) => ({ name, value: name })));
   },
@@ -208,18 +273,22 @@ export const adminCommand = {
 
     const subcommand = interaction.options.getSubcommand();
 
+    // 0. Interactive Control Panel
+    if (subcommand === 'panel' || subcommand === 'pannel') {
+      const embed = AdminUI.buildPanelEmbed(interaction.guild);
+      const rows = AdminUI.buildPanelComponents();
+      await interaction.reply({ embeds: [embed], components: rows });
+      return;
+    }
+
     // 1. Match Create (Manual Teams)
     if (subcommand === 'match-create') {
       const matchNum = interaction.options.getInteger('match_number', true);
       const lobbyName = interaction.options.getString('lobby_name', true);
       const rawTeams = interaction.options.getString('teams', true);
       const deadlineMins = interaction.options.getInteger('deadline_minutes', true);
-      const rawPlayers = interaction.options.getString('players') || '';
 
       const teams = rawTeams.split(',').map((t) => t.trim()).filter((t) => t.length > 0);
-      const players = rawPlayers
-        ? rawPlayers.split(',').map((p) => p.trim()).filter((p) => p.length > 0)
-        : teams;
 
       if (teams.length < 2) {
         await interaction.reply({ content: '❌ A lobby must have at least 2 teams.', ephemeral: true });
@@ -230,7 +299,7 @@ export const adminCommand = {
       const scheduledTime = now + deadlineMins * 60 * 1000;
       const deadline = scheduledTime;
 
-      const match = MatchService.createMatch(matchNum, lobbyName, scheduledTime, deadline, teams, players);
+      const match = MatchService.createMatch(matchNum, lobbyName, scheduledTime, deadline, teams, teams);
 
       const embed = new EmbedBuilder()
         .setColor('#2ECC71')
@@ -357,56 +426,234 @@ export const adminCommand = {
 
     // 4. Declare Result After Every Match
     if (subcommand === 'result') {
-      const matchId = interaction.options.getInteger('match_id', true);
-      const winner = interaction.options.getString('winner_1st', true).trim();
-      const second = interaction.options.getString('second_2nd', true).trim();
-      const third = interaction.options.getString('third_3rd', true).trim();
-      const topFragger = interaction.options.getString('top_fragger', true).trim();
+      const matchParam = interaction.options.getString('match');
+      const openOrLockedMatches = db.prepare(
+        "SELECT * FROM matches WHERE status IN ('OPEN', 'LOCKED') ORDER BY id DESC"
+      ).all() as any[];
+
+      let targetMatch: any = null;
+      if (matchParam) {
+        const parsed = parseInt(matchParam, 10);
+        if (!isNaN(parsed)) {
+          targetMatch = MatchService.getMatchById(parsed);
+        }
+        if (!targetMatch) {
+          targetMatch = openOrLockedMatches.find(
+            (m) => m.lobby_name.toLowerCase() === matchParam.toLowerCase()
+          );
+        }
+      } else {
+        if (openOrLockedMatches.length === 1) {
+          targetMatch = openOrLockedMatches[0];
+        } else if (openOrLockedMatches.length === 0) {
+          await interaction.reply({
+            content: '❌ No active open or locked matches found to settle.',
+            ephemeral: true,
+          });
+          return;
+        } else {
+          await interaction.reply({
+            content: `⚠️ Multiple active matches found. Please specify which match using the \`match\` option:\n${openOrLockedMatches.map((m) => `• Match #${m.match_number}: **${m.lobby_name}**`).join('\n')}`,
+            ephemeral: true,
+          });
+          return;
+        }
+      }
+
+      if (!targetMatch) {
+        await interaction.reply({ content: '❌ Selected match was not found.', ephemeral: true });
+        return;
+      }
+
+      const rawStandings = interaction.options.getString('standings');
+      let standings: string[] = [];
+
+      if (rawStandings && rawStandings.trim().length > 0) {
+        standings = rawStandings.split(',').map((t) => t.trim()).filter((t) => t.length > 0);
+      } else {
+        const winner = interaction.options.getString('winner_1st')?.trim();
+        const second = interaction.options.getString('second_2nd')?.trim();
+        const third = interaction.options.getString('third_3rd')?.trim();
+        if (winner) standings.push(winner);
+        if (second) standings.push(second);
+        if (third) standings.push(third);
+      }
+
+      const standingPic = interaction.options.getAttachment('standing_pic');
+      const picUrl = interaction.options.getString('pic_url')?.trim();
+      const finalImageUrl = standingPic ? standingPic.url : picUrl || undefined;
+
+      if (standings.length === 0) {
+        await interaction.reply({
+          content: '❌ Please provide either the full `standings` (comma-separated list of 1st to 16th teams), `winner_1st`, or attach a scoreboard photo alongside the winner.',
+          ephemeral: true,
+        });
+        return;
+      }
 
       try {
-        const { resolvedLegsCount, eliminatedTicketsCount } = SettlementService.recordMatchResult(
-          matchId,
-          winner,
-          second,
-          third,
-          topFragger
+        const outcome = SettlementService.recordMatchResult(
+          targetMatch.id,
+          standings,
+          undefined,
+          undefined,
+          finalImageUrl
         );
 
-        const match = MatchService.getMatchById(matchId);
-
         const embed = new EmbedBuilder()
-          .setColor('#00E676')
-          .setTitle(`🏁 MATCH #${matchId} OFFICIAL RESULT DECLARED!`)
-          .setDescription(match ? `**${match.lobby_name}**` : `Match #${matchId}`)
-          .addFields(
-            { name: '🥇 1st Place (WWCD)', value: `🏆 **${winner}**`, inline: true },
-            { name: '🥈 2nd Place', value: `🥈 **${second}**`, inline: true },
-            { name: '🥉 3rd Place', value: `🥉 **${third}**`, inline: true },
-            { name: '🎯 Top Fragger', value: `🔥 **${topFragger}**`, inline: true },
-            { name: '📊 Resolved Legs', value: `\`${resolvedLegsCount}\` selections checked`, inline: true },
-            { name: '❌ Eliminated Slips', value: `\`${eliminatedTicketsCount}\` slips knocked out`, inline: true }
+          .setColor('#57F287')
+          .setTitle(`${SERVER_EMOJIS.VC_BADGE} Match #${targetMatch.match_number} Results Settled`)
+          .setDescription(
+            `Official results for **${targetMatch.lobby_name}** have been verified and processed.`
           )
-          .setFooter({ text: 'Official result confirmed • Active player slips updated instantly!' });
+          .addFields(
+            { name: '🥇 1st Place (Winner)', value: formatTeamWithEmoji(outcome.winner, interaction.guild || undefined), inline: true },
+            { name: '🥈 2nd Place', value: formatTeamWithEmoji(standings[1] || 'N/A', interaction.guild || undefined), inline: true },
+            { name: '🥉 3rd Place', value: formatTeamWithEmoji(standings[2] || 'N/A', interaction.guild || undefined), inline: true },
+            { name: '📊 Resolved Legs', value: `\`${outcome.resolvedLegsCount}\``, inline: true },
+            { name: '❌ Eliminated Slips', value: `\`${outcome.eliminatedTicketsCount}\``, inline: true }
+          );
 
-        await interaction.reply({ embeds: [embed] });
+        if (finalImageUrl) {
+          embed.setImage(finalImageUrl);
+        }
+
+        if (standings.length > 3) {
+          const top5Formatted = standings.slice(2, 5).map((t) => formatTeamWithEmoji(t, interaction.guild || undefined)).join(', ');
+          const top10Formatted = standings.slice(4, 10).map((t) => formatTeamWithEmoji(t, interaction.guild || undefined)).join(', ');
+          const bottomFormatted = standings.slice(10, 16).map((t) => formatTeamWithEmoji(t, interaction.guild || undefined)).join(', ');
+
+          embed.addFields(
+            { name: '🎖️ #3 - #5 Placements', value: top5Formatted || 'None', inline: false },
+            { name: '🎯 #5 - #10 Placements', value: top10Formatted || 'None', inline: false },
+            { name: '💀 #11 - #16 Placements', value: bottomFormatted || 'None', inline: false }
+          );
+        }
+
+        // Add Winning Predictors & Payouts field
+        const winnerFields = NotificationService.formatWinnerFields(outcome);
+        embed.addFields(winnerFields);
+
+        embed.setFooter({ text: 'VC Arena • Match Settlement • Official Results Verified' });
+
+        const pingContent = NotificationService.getWinnerMentionContent(outcome);
+        await interaction.reply({ content: pingContent, embeds: [embed] });
+
+        // Dispatch DMs to winning and eliminated predictors
+        await NotificationService.notifyMatchResults(interaction.client, outcome);
       } catch (err: any) {
         await interaction.reply({ content: `❌ Error: ${err.message}`, ephemeral: true });
       }
       return;
     }
 
-    // 5. Group Set
+    // 5. Group Set (Role Selector or Mentioned Roles)
     if (subcommand === 'group-set') {
       const groupName = interaction.options.getString('group_name', true).trim();
-      const rawTeams = interaction.options.getString('teams', true);
-      const teams = rawTeams.split(',').map((t) => t.trim()).filter((t) => t.length > 0);
+      const rawRolesOrTeams = interaction.options.getString('roles');
 
-      const result = TeamGroupService.assignTeamsToGroup(groupName, teams);
+      if (!rawRolesOrTeams || rawRolesOrTeams.trim().length === 0) {
+        // Render Discord's native RoleSelectMenuBuilder!
+        const roleMenu = new RoleSelectMenuBuilder()
+          .setCustomId(`select_group_roles:${groupName}`)
+          .setPlaceholder(`Click here to select team roles for ${groupName}...`)
+          .setMinValues(1)
+          .setMaxValues(25);
+
+        const row = new ActionRowBuilder<RoleSelectMenuBuilder>().addComponents(roleMenu);
+
+        const embed = new EmbedBuilder()
+          .setColor('#3498DB')
+          .setTitle(`📁 Select Team Roles for ${groupName}`)
+          .setDescription(
+            `Select all the team roles for **${groupName}** using the Discord role dropdown below.\n\n` +
+            `• You can select up to **25 roles at once**!\n` +
+            `• No typing required — simply click each team's role in the list.\n` +
+            `• The bot will automatically map each role to its registered team name.`
+          )
+          .setFooter({ text: 'Select team roles below' });
+
+        await interaction.reply({ embeds: [embed], components: [row] });
+        return;
+      }
+
+      // If roles were passed directly as text / mentions (e.g. <@&12345678>)
+      const matchedTeams: string[] = [];
+      const unmatchedNames: string[] = [];
+
+      const roleMentionRegex = /<@&(\d+)>/g;
+      const roleIdMatches = Array.from(rawRolesOrTeams.matchAll(roleMentionRegex)).map((m) => m[1]);
+
+      if (roleIdMatches.length > 0 && interaction.guild) {
+        for (const roleId of roleIdMatches) {
+          const role = interaction.guild.roles.cache.get(roleId);
+          if (role) {
+            if (FanService.isSystemRole(role.name)) {
+              unmatchedNames.push(`@${role.name}`);
+              continue;
+            }
+            const teamName = FanService.matchRoleToTeam(role) || role.name.trim();
+            if (!matchedTeams.includes(teamName)) {
+              matchedTeams.push(teamName);
+            }
+          }
+        }
+      } else {
+        const items = rawRolesOrTeams.split(',').map((t) => t.trim()).filter((t) => t.length > 0);
+        for (const item of items) {
+          const role = interaction.guild?.roles.cache.find(
+            (r) => r.name.toLowerCase() === item.toLowerCase() || `@${r.name.toLowerCase()}` === item.toLowerCase()
+          );
+          if (role) {
+            if (FanService.isSystemRole(role.name)) {
+              unmatchedNames.push(`@${role.name}`);
+              continue;
+            }
+            const teamName = FanService.matchRoleToTeam(role) || role.name.trim();
+            if (!matchedTeams.includes(teamName)) {
+              matchedTeams.push(teamName);
+              continue;
+            }
+          }
+
+          const directTeam = TeamGroupService.findTeam(item);
+          if (directTeam && !matchedTeams.includes(directTeam.name)) {
+            matchedTeams.push(directTeam.name);
+          } else if (item.length > 0 && !FanService.isSystemRole(item)) {
+            const clean = item.replace(/^@/, '').trim();
+            if (!matchedTeams.includes(clean)) {
+              matchedTeams.push(clean);
+            }
+          } else {
+            unmatchedNames.push(item);
+          }
+        }
+      }
+
+      if (matchedTeams.length === 0) {
+        await interaction.reply({
+          content: `❌ Could not match any roles or teams from: "${rawRolesOrTeams}".\nTip: Leave the \`roles\` option blank to open the interactive role selector menu!`,
+          ephemeral: true,
+        });
+        return;
+      }
+
+      const result = TeamGroupService.assignTeamsToGroup(groupName, matchedTeams);
 
       const embed = new EmbedBuilder()
-        .setColor('#3498DB')
-        .setTitle(`📁 Group Updated: ${groupName}`)
-        .setDescription(`Successfully assigned **${result.assigned.length} teams** to **${groupName}**:\n${result.assigned.join(', ')}`);
+        .setColor('#2ECC71')
+        .setTitle(`📁 Group Configured: ${groupName}`)
+        .setDescription(
+          `Successfully assigned **${result.assigned.length} teams** to **${groupName}**:\n` +
+          result.assigned.map((t) => `• ${t}`).join('\n')
+        );
+
+      if (unmatchedNames.length > 0) {
+        embed.addFields({
+          name: 'ℹ️ Non-Team Roles Ignored',
+          value: unmatchedNames.join(', '),
+        });
+      }
 
       await interaction.reply({ embeds: [embed] });
       return;
@@ -511,15 +758,53 @@ export const adminCommand = {
 
     // 11. Cancel Match
     if (subcommand === 'cancel') {
-      const matchId = interaction.options.getInteger('match_id', true);
+      const matchParam = interaction.options.getString('match');
       const reason = interaction.options.getString('reason') || 'Cancelled by admin';
 
+      const openOrLockedMatches = db.prepare(
+        "SELECT * FROM matches WHERE status IN ('OPEN', 'LOCKED') ORDER BY id DESC"
+      ).all() as any[];
+
+      let targetMatch: any = null;
+      if (matchParam) {
+        const parsed = parseInt(matchParam, 10);
+        if (!isNaN(parsed)) {
+          targetMatch = MatchService.getMatchById(parsed);
+        }
+        if (!targetMatch) {
+          targetMatch = openOrLockedMatches.find(
+            (m) => m.lobby_name.toLowerCase() === matchParam.toLowerCase()
+          );
+        }
+      } else {
+        if (openOrLockedMatches.length === 1) {
+          targetMatch = openOrLockedMatches[0];
+        } else if (openOrLockedMatches.length === 0) {
+          await interaction.reply({
+            content: '❌ No active open or locked matches found to cancel.',
+            ephemeral: true,
+          });
+          return;
+        } else {
+          await interaction.reply({
+            content: `⚠️ Multiple active matches found. Please specify which match using the \`match\` option:\n${openOrLockedMatches.map((m) => `• Match #${m.match_number}: **${m.lobby_name}**`).join('\n')}`,
+            ephemeral: true,
+          });
+          return;
+        }
+      }
+
+      if (!targetMatch) {
+        await interaction.reply({ content: '❌ Selected match was not found.', ephemeral: true });
+        return;
+      }
+
       try {
-        const { voidedLegs, refundedTickets } = SettlementService.cancelMatch(matchId, reason);
+        const { voidedLegs, refundedTickets } = SettlementService.cancelMatch(targetMatch.id, reason);
 
         const embed = new EmbedBuilder()
           .setColor('#E67E22')
-          .setTitle(`⚠️ Match #${matchId} Cancelled`)
+          .setTitle(`⚠️ Match #${targetMatch.match_number} (${targetMatch.lobby_name}) Cancelled`)
           .setDescription(`Reason: *${reason}*`)
           .addFields(
             { name: 'Voided Legs (Odds 1.0x)', value: `\`${voidedLegs}\` legs downgraded`, inline: true },
@@ -609,6 +894,42 @@ export const adminCommand = {
         .setFooter({ text: 'iGRI Fantasy Arena Security Engine' });
 
       await interaction.reply({ embeds: [embed] });
+      return;
+    }
+
+    // 14. Add Balance to Player
+    if (subcommand === 'add-balance') {
+      const targetUser = interaction.options.getUser('user', true);
+      const amount = interaction.options.getInteger('amount', true);
+      const reason = interaction.options.getString('reason') || 'Admin grant';
+
+      try {
+        const result = UserService.addBalance(
+          targetUser.id,
+          targetUser.username,
+          amount,
+          interaction.user.id,
+          reason
+        );
+
+        const embed = new EmbedBuilder()
+          .setColor('#57F287')
+          .setTitle(`${SERVER_EMOJIS.VC_BADGE} Balance Updated`)
+          .setDescription(`Successfully credited **+${amount.toLocaleString()} coins** to <@${targetUser.id}>.`)
+          .addFields(
+            { name: '👤 Recipient', value: `${targetUser.username}`, inline: true },
+            { name: '🪙 Previous', value: `\`${result.oldBalance.toLocaleString()}\` coins`, inline: true },
+            { name: '💰 New Balance', value: `\`${result.newBalance.toLocaleString()}\` coins`, inline: true },
+            { name: '📝 Reason', value: reason, inline: true },
+            { name: '👑 Admin', value: `<@${interaction.user.id}>`, inline: true }
+          )
+          .setFooter({ text: 'VC Arena • Balance Management' })
+          .setTimestamp();
+
+        await interaction.reply({ embeds: [embed] });
+      } catch (err: any) {
+        await interaction.reply({ content: `❌ Failed to add balance: ${err.message}`, ephemeral: true });
+      }
       return;
     }
   },

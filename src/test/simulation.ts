@@ -17,8 +17,9 @@ console.log('🧪 ========================================================\n');
 initDatabase();
 console.log('✅ 1. Database and tables initialized successfully.');
 
-// 2. Verify 43 Official Teams & Group System
+// 2. Verify Official Teams & Group System
 console.log('\n👥 2. Verifying Official Teams & Tournament Groups:');
+const previousGroupState = db.prepare('SELECT name, group_name FROM teams WHERE group_name IS NOT NULL').all() as { name: string; group_name: string }[];
 const allTeams = TeamGroupService.getAllTeams();
 console.log(`   • Total Teams in DB: ${allTeams.length} teams`);
 if (allTeams.length < 43) {
@@ -147,30 +148,32 @@ const teamB2 = groupBTeams[1];
 const teamC1 = groupCTeams[0];
 const teamC2 = groupCTeams[1];
 
-// User A: 2-leg combo (Match 1: Winner teamA1, Match 2: Top 3 teamB1), Stake = 1000
+// User A: 2-bracket combo (Match 1: #1 Winner teamA1, #2-#3 Podium teamB1), Stake = 1000
 const ticketA = PredictionService.submitTicket(userA.id, userA.username, 1000, [
-  { matchId: match1.id, marketType: 'WINNER', selectedTarget: teamA1 },
-  { matchId: match2.id, marketType: 'TOP_3', selectedTarget: teamB1 },
+  { matchId: match1.id, marketType: 'POS_1', selectedTarget: teamA1 },
+  { matchId: match1.id, marketType: 'POS_2_3', selectedTarget: teamB1 },
 ]);
 console.log(`   • ${userA.username} submitted Ticket #${ticketA.id}: Stake = ${ticketA.stake}, Weight = ${ticketA.combo_weight}x`);
 
-// User B: 3-leg combo (Match 1: Winner teamB2, Match 2: Top 3 teamC1, Match 3: Top Fragger teamA2), Stake = 800
+// User B: 3-bracket combo (Match 1: #1 Winner teamB2, #2-#3 Podium teamA2, #3-#5 Top 5 teamB1), Stake = 800
 const ticketB = PredictionService.submitTicket(userB.id, userB.username, 800, [
-  { matchId: match1.id, marketType: 'WINNER', selectedTarget: teamB2 },
-  { matchId: match2.id, marketType: 'TOP_3', selectedTarget: teamC1 },
-  { matchId: match3.id, marketType: 'TOP_FRAGGER', selectedTarget: teamA2 },
+  { matchId: match1.id, marketType: 'POS_1', selectedTarget: teamB2 },
+  { matchId: match1.id, marketType: 'POS_2_3', selectedTarget: teamA2 },
+  { matchId: match1.id, marketType: 'POS_3_5', selectedTarget: teamB1 },
 ]);
 console.log(`   • ${userB.username} submitted Ticket #${ticketB.id}: Stake = ${ticketB.stake}, Weight = ${ticketB.combo_weight}x`);
 
 // 8. Admin Declares Result After Every Match
 console.log('\n🏁 8. Admin Declaring Official Results After Every Match:');
-// Match 1 finishes: teamA1 wins! 2nd teamB1, 3rd teamB2, Top Fragger teamA1
-const res1 = SettlementService.recordMatchResult(match1.id, teamA1, teamB1, teamB2, teamA1);
-console.log(`   • Match 1 Settled: 1st=${teamA1}, 2nd=${teamB1}, 3rd=${teamB2}, Top Fragger=${teamA1} (Resolved legs: ${res1.resolvedLegsCount})`);
+// Match 1 finishes with full standings 1 to 16: teamA1 wins (1st), teamB1 (2nd), teamB2 (3rd), teamA2 (4th)...
+const match1Standings = [teamA1, teamB1, teamB2, teamA2, ...match1Teams.filter(t => ![teamA1, teamB1, teamB2, teamA2].includes(t))];
+const res1 = SettlementService.recordMatchResult(match1.id, match1Standings);
+console.log(`   • Match 1 Settled: 1st=${res1.winner}, Top 3=${res1.top3.join(', ')} (Resolved legs: ${res1.resolvedLegsCount})`);
 
-// Match 2 finishes: teamC1 wins! 2nd teamB1, 3rd teamC2, Top Fragger=teamB1
-const res2 = SettlementService.recordMatchResult(match2.id, teamC1, teamB1, teamC2, teamB1);
-console.log(`   • Match 2 Settled: 1st=${teamC1}, 2nd=${teamB1}, 3rd=${teamC2}, Top Fragger=${teamB1} (Resolved legs: ${res2.resolvedLegsCount})`);
+// Match 2 finishes: teamC1 wins (1st), teamB1 (2nd), teamC2 (3rd)...
+const match2Standings = [teamC1, teamB1, teamC2, ...match2Teams.filter(t => ![teamC1, teamB1, teamC2].includes(t))];
+const res2 = SettlementService.recordMatchResult(match2.id, match2Standings);
+console.log(`   • Match 2 Settled: 1st=${res2.winner}, Top 3=${res2.top3.join(', ')} (Resolved legs: ${res2.resolvedLegsCount})`);
 
 // 9. Void Leg (Push) Rule test on Match 3 cancellation
 console.log('\n⚠️ 9. Testing Void Leg / Push Rule on Match 3 Cancellation:');
@@ -205,15 +208,18 @@ console.log(`   • ${userA.username} bought: ${shopResult.item.name} for ${shop
 const userAFinal = UserService.getUser(userA.id)!;
 console.log(`   • Remaining Balance: ${userAFinal.balance} coins`);
 
-// 13. Clean up simulation artifacts so live database is clean
+// 13. Clean up simulation artifacts and restore live tournament groups
 TeamGroupService.resetAllGroups();
+for (const row of previousGroupState) {
+  db.prepare('UPDATE teams SET group_name = ? WHERE name = ?').run(row.group_name, row.name);
+}
 db.prepare("DELETE FROM ticket_legs WHERE ticket_id IN (SELECT id FROM tickets WHERE user_id LIKE 'test_user_%')").run();
 db.prepare("DELETE FROM tickets WHERE user_id LIKE 'test_user_%'").run();
 db.prepare("DELETE FROM transactions_ledger WHERE user_id LIKE 'test_user_%'").run();
 db.prepare("DELETE FROM user_inventory WHERE user_id LIKE 'test_user_%'").run();
 db.prepare("DELETE FROM users WHERE id LIKE 'test_user_%'").run();
 
-console.log('\n🧹 Simulation cleanup completed: 43 teams remain cleanly UNGROUPED for live tournament use.');
+console.log(`\n🧹 Simulation cleanup completed: Restored ${previousGroupState.length} configured tournament group assignments.`);
 
 console.log('\n🎉 ========================================================');
 console.log('🎉 ALL 12 ENGINE SIMULATION TESTS PASSED FLAWLESSLY!');

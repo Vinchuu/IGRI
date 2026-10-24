@@ -1,5 +1,6 @@
 import { ChatInputCommandInteraction, EmbedBuilder, SlashCommandBuilder } from 'discord.js';
 import { LeaderboardService } from '../../services/LeaderboardService.js';
+import { SERVER_EMOJIS } from '../../utils/emojis.js';
 
 export const leaderboardCommand = {
   data: new SlashCommandBuilder()
@@ -10,35 +11,40 @@ export const leaderboardCommand = {
     const rankings = LeaderboardService.getRankings(10);
 
     const embed = new EmbedBuilder()
-      .setColor('#E67E22')
-      .setTitle('🏆 iGRI Fantasy Arena — Official Leaderboard')
+      .setColor('#F1C40F')
+      .setTitle(`${SERVER_EMOJIS.VC_BADGE} VC Arena • Leaderboard`)
       .setDescription(
-        'Rankings are scored via: **0.60 × Profit Score + 0.40 × Accuracy Score**.\n*Note: Requires minimum 10 resolved picks to qualify for official rank.*'
+        `Top analysts ranked by **60% Profit + 40% Accuracy** (min. 10 picks to qualify).`
       );
 
     if (rankings.length === 0) {
       embed.addFields({
-        name: 'No Competitors Yet',
-        value: 'Be the first to place a combo prediction with `/predict`!',
+        name: '🏆 No Ranked Players',
+        value: 'Place your first winning prediction with `/predict` to join the board!',
       });
     } else {
       const rows = rankings.map((r) => {
-        const medal = r.rank === 1 ? '🥇' : r.rank === 2 ? '🥈' : r.rank === 3 ? '🥉' : `**#${r.rank}**`;
-        const qualifiedTag = r.isQualified ? '' : ' *(Unqualified <10 picks)*';
+        let medal = `\`#${r.rank}\``;
+        if (r.rank === 1) medal = '🥇';
+        else if (r.rank === 2) medal = '🥈';
+        else if (r.rank === 3) medal = '🥉';
+
+        const qualifiedTag = r.isQualified ? ' ⭐' : '';
         const profitSign = r.netProfit >= 0 ? '+' : '';
+
         return (
-          `${medal} **${r.username}** [${r.equippedTitle}]${qualifiedTag}\n` +
-          `• **Score:** \`${r.compositeScore} pts\` | **Profit:** \`${profitSign}${r.netProfit.toLocaleString()}\` coins | **Accuracy:** \`${r.accuracyScore}%\` (${r.correctSelections}/${r.resolvedSelections})`
+          `• ${medal} **${r.username}** \`${r.equippedTitle}\`${qualifiedTag}\n` +
+          `  Score: **${r.compositeScore}** • Profit: **${profitSign}${r.netProfit.toLocaleString()}** coins • Acc: **${r.accuracyScore}%**`
         );
       });
 
       embed.addFields({
-        name: 'Top Analysts',
-        value: rows.join('\n\n'),
+        name: '🏅 Top Analysts',
+        value: rows.join('\n'),
       });
     }
 
-    embed.setFooter({ text: 'Updated live • Season winners rewarded at tournament final' });
+    embed.setFooter({ text: 'VC Arena • Updated in real-time' });
 
     await interaction.reply({ embeds: [embed] });
   },

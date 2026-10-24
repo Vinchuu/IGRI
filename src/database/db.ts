@@ -59,6 +59,7 @@ export function initDatabase(): void {
       result_second TEXT DEFAULT NULL,
       result_third TEXT DEFAULT NULL,
       result_top_fragger TEXT DEFAULT NULL,
+      result_image_url TEXT DEFAULT NULL,
       created_at INTEGER NOT NULL
     );
 
@@ -131,6 +132,12 @@ export function initDatabase(): void {
     CREATE INDEX IF NOT EXISTS idx_transactions_user ON transactions_ledger(user_id);
     CREATE INDEX IF NOT EXISTS idx_teams_group ON teams(group_name);
   `);
+
+  try {
+    db.prepare('ALTER TABLE matches ADD COLUMN result_image_url TEXT DEFAULT NULL').run();
+  } catch {
+    // Column already exists
+  }
 
   // Seed default Season 1 if none exists
   const activeSeason = db.prepare("SELECT id FROM seasons WHERE status = 'ACTIVE' LIMIT 1").get();

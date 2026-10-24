@@ -6,8 +6,8 @@ A complete, production-ready Discord bot for the **iGRI FiveM Multi-Lobby Tourna
 
 ## 🌟 Key Features
 
-* **Multi-Lobby Esports Markets (BGMI / FiveM Style):**
-  * 🥇 **1st Place Winner** (WWCD / Match Winner)
+* **Multi-Lobby Esports Markets (GTA V / FiveM Style):**
+  * 🥇 **1st Place Winner** (Match Champion)
   * 🥉 **Top 3 Podium Finish** (1st, 2nd, or 3rd place)
   * 🎯 **Top Fragger** (Most Kills in the lobby)
 * **Pari-Mutuel Season Combo Pool:**

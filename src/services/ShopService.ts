@@ -2,6 +2,7 @@ import { db } from '../database/db.js';
 import { ShopItem } from '../types/index.js';
 import { LedgerService } from './LedgerService.js';
 import { UserService } from './UserService.js';
+import { AuditLogService } from './AuditLogService.js';
 
 export class ShopService {
   /**
@@ -56,6 +57,8 @@ export class ShopService {
     });
 
     executePurchase();
+
+    AuditLogService.logShopPurchase(userId, username, item, updatedBalance).catch(() => {});
 
     return {
       success: true,

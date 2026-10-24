@@ -1,4 +1,5 @@
 import { db } from '../database/db.js';
+import { AuditLogService } from './AuditLogService.js';
 
 export interface TeamEntity {
   id: number;
@@ -20,6 +21,17 @@ export class TeamGroupService {
   static getTeamsByGroup(groupName: string): string[] {
     const rows = db.prepare('SELECT name FROM teams WHERE LOWER(group_name) = LOWER(?) ORDER BY name ASC').all(groupName) as { name: string }[];
     return rows.map((r) => r.name);
+  }
+
+  /**
+   * Finds a team by exact or partial name
+   */
+  static findTeam(query: string): TeamEntity | null {
+    if (!query) return null;
+    const clean = query.trim().toLowerCase();
+    const all = this.getAllTeams();
+    return all.find((t) => t.name.toLowerCase() === clean) ||
+           all.find((t) => t.name.toLowerCase().includes(clean)) || null;
   }
 
   /**
@@ -72,6 +84,13 @@ export class TeamGroupService {
     });
 
     updateTx();
+
+    AuditLogService.logGroupConfig(
+      'Admin / System',
+      `Assigned Teams to ${groupName}`,
+      `Assigned ${assigned.length} teams to **${groupName}**:\n${assigned.join(', ')}`
+    ).catch(() => {});
+
     return { assigned, notFound };
   }
 
@@ -99,6 +118,13 @@ export class TeamGroupService {
     });
 
     updateTx();
+
+    AuditLogService.logGroupConfig(
+      'Admin / System',
+      `Auto-Split Teams into ${count} Groups`,
+      Object.entries(groups).map(([g, tms]) => `**${g}** (${tms.length}): ${tms.join(', ')}`).join('\n')
+    ).catch(() => {});
+
     return groups;
   }
 
@@ -107,6 +133,13 @@ export class TeamGroupService {
    */
   static resetAllGroups(): number {
     const info = db.prepare('UPDATE teams SET group_name = NULL').run();
+
+    AuditLogService.logGroupConfig(
+      'Admin / System',
+      'Reset All Tournament Groups',
+      `Cleared group assignments for ${info.changes} team(s). All teams are now ungrouped.`
+    ).catch(() => {});
+
     return info.changes;
   }
 
